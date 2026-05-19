@@ -437,10 +437,6 @@ function App() {
       {menuOpen && <div className="backdrop" onClick={handleMenuToggle}></div>}
       {menuOpen && (
         <div className="dropdown-menu">
-          <div className="dropdown-search">
-            🔍 검색 (준비 중)
-          </div>
-
           <button
             className={`dropdown-link ${category === 'general' ? 'active' : ''}`}
             onClick={() => handleCategoryChange('general')}
