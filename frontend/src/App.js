@@ -36,26 +36,27 @@ function App() {
     cards: '오늘의 카드'
   };
 
-  // 뉴스 데이터 가져오기
-  const fetchNews = async (selectedCategory) => {
+  // 분야 데이터 (뉴스 + 카드) 한 번에 가져오기
+  const fetchCategoryData = async (cat) => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `${API_BASE}/api/news?category=${selectedCategory}`
-      );
-      const data = await response.json();
-      if (data.success) {
-        setArticles(data.articles || []);
+      const [newsRes, cardsRes] = await Promise.all([
+        fetch(`${API_BASE}/api/news?category=${cat}`).then((r) => r.json()).catch(() => null),
+        fetch(`${API_BASE}/api/cards`).then((r) => r.json()).catch(() => null)
+      ]);
+      setArticles(newsRes && newsRes.success ? newsRes.articles || [] : []);
+      if (cardsRes && cardsRes.success) {
+        setCards(cardsRes.cards || {});
       }
     } catch (error) {
-      console.error('뉴스 조회 오류:', error);
+      console.error('데이터 조회 오류:', error);
       setArticles([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // 카드 데이터 가져오기
+  // 카드만 가져오기 ('오늘의 카드' 메뉴용)
   const fetchCards = async () => {
     setLoading(true);
     try {
@@ -76,16 +77,17 @@ function App() {
   useEffect(() => {
     setMenuOpen(false);
 
+    if (category === 'about') return;
     if (category === 'cards') {
       fetchCards();
     } else {
-      fetchNews(category);
+      fetchCategoryData(category);
     }
   }, [category]);
 
-  // 카드 피드 높이 측정 (고정 헤더 높이를 빼고 남은 화면을 채움)
+  // 스와이프 피드 높이 측정 (고정 헤더 높이를 빼고 남은 화면을 채움)
   useEffect(() => {
-    if (category !== 'cards') return;
+    if (category === 'about') return;
 
     const measure = () => {
       const el = cardFeedRef.current;
@@ -165,74 +167,205 @@ function App() {
     </div>
   );
 
-  // 뉴스 페이지 렌더링
-  const renderNewsPage = () => (
-    <div className="news-grid">
-      {loading && <div className="loading">뉴스를 불러오는 중입니다...</div>}
-      {!loading && articles.length === 0 && (
-        <div className="loading">
-          아직 불러온 뉴스가 없습니다.<br />
-          나중에 다시 시도해주세요.
-        </div>
-      )}
-      {articles.map((article, index) => (
-        <div key={index} className="news-article">
-          <h2 className="article-title">{article.title}</h2>
-          <div className="article-meta">
-            <span className="article-date">{article.date}</span>
+  // 카드 한 장 렌더링 (분야 페이지 / 오늘의 카드 공용)
+  const renderCardArticle = (card) => {
+    const activePerspectives = PERSPECTIVE_DEFS
+      .map((def) => ({
+        ...def,
+        data: card.perspectives && card.perspectives[def.key]
+      }))
+      .filter((p) => p.data && p.data.framing);
+
+    const hasFacts = card.facts && card.facts.length > 0;
+
+    return (
+      <section className="prism-card-screen" key={card.id}>
+        <article className="prism-card">
+          <div className="prism-card-top">
+            <span className="prism-card-cat">
+              {card.categoryLabel || categoryLabels[card.category] || ''}
+            </span>
+            <span className="prism-card-date">{card.date}</span>
           </div>
 
-          {article.analysis && (
-            <div className="summary-block">
-              <div className="summary-title">📋 객관적 분석</div>
-              <p className="summary-text">{article.analysis}</p>
+          <h2 className="prism-card-title">{card.title}</h2>
+
+          {/* 확인된 사실 */}
+          {hasFacts && (
+            <div className="prism-fact-box">
+              <div className="prism-section-label">📌 확인된 사실</div>
+              <ul className="prism-fact-list">
+                {card.facts.map((fact, idx) => (
+                  <li key={idx}>{fact}</li>
+                ))}
+              </ul>
             </div>
           )}
 
-          <div className="article-sources">
-            {article.sources.map((source, idx) => (
-              <div key={idx} className="source-block">
-                <div className="source-header">
-                  {source.link ? (
-                    <a 
-                      href={source.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="source-name-link"
-                    >
-                      {source.name}
-                    </a>
-                  ) : (
-                    <span className="source-name">{source.name}</span>
-                  )}
-                </div>
-                <p className="source-content">{source.content}</p>
-                {source.link && (
+          {/* 매체별 해석 (진보 / 보수 / 해외) */}
+          {activePerspectives.length > 0 && (
+            <>
+              <div className="prism-section-label prism-perspective-label">
+                🔍 매체별 해석
+              </div>
+              <div className="prism-perspective-grid">
+                {activePerspectives.map((p) => (
+                  <div className={`prism-perspective ${p.cls}`} key={p.key}>
+                    <div className="prism-perspective-head">
+                      <span className="prism-side-label">{p.label}</span>
+                      {(p.data.outlets || []).length > 0 && (
+                        <div className="prism-outlet-tags">
+                          {p.data.outlets.map((outlet, idx) => (
+                            <span key={idx} className="prism-outlet-tag">
+                              {outlet}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p className="prism-framing">{p.data.framing}</p>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* 구버전 데이터 호환: facts/perspectives 없이 analysis만 있을 때 */}
+          {!hasFacts && activePerspectives.length === 0 && card.analysis && (
+            <div className="prism-fact-box">
+              <p className="prism-framing prism-framing-fallback">
+                {card.analysis}
+              </p>
+            </div>
+          )}
+
+          {/* 원문 링크 */}
+          {card.sources && card.sources.length > 0 && (
+            <div className="prism-card-sources">
+              {card.sources
+                .filter((s) => s.link)
+                .map((source, idx) => (
                   <a
+                    key={idx}
                     href={source.link}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="source-link"
+                    className="prism-source-link"
                   >
-                    원문 보기 →
+                    {source.name} 원문 ↗
                   </a>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+                ))}
+            </div>
+          )}
+        </article>
+      </section>
+    );
+  };
 
-  // 카드 페이지 렌더링 - 풀스크린 세로 스와이프 피드
+  // 뉴스 기사 목록 렌더링 (분야 페이지 하단)
+  const renderNewsList = () => {
+    if (articles.length === 0) {
+      return <div className="prism-news-empty">불러온 뉴스가 없습니다.</div>;
+    }
+    return (
+      <div className="news-grid">
+        {articles.map((article, index) => (
+          <div key={index} className="news-article">
+            <h2 className="article-title">{article.title}</h2>
+            <div className="article-meta">
+              <span className="article-date">{article.date}</span>
+            </div>
+
+            {article.analysis && (
+              <div className="summary-block">
+                <div className="summary-title">📋 객관적 분석</div>
+                <p className="summary-text">{article.analysis}</p>
+              </div>
+            )}
+
+            <div className="article-sources">
+              {article.sources.map((source, idx) => (
+                <div key={idx} className="source-block">
+                  <div className="source-header">
+                    {source.link ? (
+                      <a
+                        href={source.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="source-name-link"
+                      >
+                        {source.name}
+                      </a>
+                    ) : (
+                      <span className="source-name">{source.name}</span>
+                    )}
+                  </div>
+                  <p className="source-content">{source.content}</p>
+                  {source.link && (
+                    <a
+                      href={source.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="source-link"
+                    >
+                      원문 보기 →
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // 분야 페이지 - 그 분야의 카드 피드 + 그 아래 뉴스 목록
+  const renderCategoryPage = () => {
+    const categoryCards = cards[category] || [];
+
+    return (
+      <div
+        className="prism-category-view"
+        ref={cardFeedRef}
+        style={{ height: feedHeight }}
+      >
+        {loading && (
+          <div className="prism-card-loading">불러오는 중입니다...</div>
+        )}
+
+        {!loading && (
+          <>
+            {/* 이 분야의 카드 스와이프 피드 */}
+            {categoryCards.map((card) => renderCardArticle(card))}
+
+            {categoryCards.length === 0 && (
+              <div className="prism-cards-empty-note">
+                이 분야의 카드는 아직 없습니다.<br />
+                아래에서 최신 뉴스를 확인하세요.
+              </div>
+            )}
+
+            {/* 카드 아래 - 기존 뉴스 목록 */}
+            <div className="prism-news-section">
+              <div className="prism-news-heading">
+                📰 {categoryLabels[category]} 최신 뉴스
+              </div>
+              {renderNewsList()}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // 오늘의 카드 - 모든 분야 카드를 한 줄로
   const renderCardsPage = () => {
     const categoryOrder = [
       'general', 'politics', 'economy', 'science', 'health',
       'international', 'sports', 'culture', 'popular'
     ];
 
-    // 모든 분야의 카드를 한 줄로 펼침
     const allCards = [];
     categoryOrder.forEach((cat) => {
       (cards[cat] || []).forEach((card) => allCards.push(card));
@@ -255,100 +388,7 @@ function App() {
           </div>
         )}
 
-        {!loading && allCards.map((card) => {
-          // 내용이 있는 해석 칸만 추림 (진보 / 보수 / 해외)
-          const activePerspectives = PERSPECTIVE_DEFS
-            .map((def) => ({
-              ...def,
-              data: card.perspectives && card.perspectives[def.key]
-            }))
-            .filter((p) => p.data && p.data.framing);
-
-          const hasFacts = card.facts && card.facts.length > 0;
-
-          return (
-            <section className="prism-card-screen" key={card.id}>
-              <article className="prism-card">
-                <div className="prism-card-top">
-                  <span className="prism-card-cat">
-                    {card.categoryLabel || categoryLabels[card.category] || ''}
-                  </span>
-                  <span className="prism-card-date">{card.date}</span>
-                </div>
-
-                <h2 className="prism-card-title">{card.title}</h2>
-
-                {/* 확인된 사실 */}
-                {hasFacts && (
-                  <div className="prism-fact-box">
-                    <div className="prism-section-label">📌 확인된 사실</div>
-                    <ul className="prism-fact-list">
-                      {card.facts.map((fact, idx) => (
-                        <li key={idx}>{fact}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* 매체별 해석 (진보 / 보수 / 해외) */}
-                {activePerspectives.length > 0 && (
-                  <>
-                    <div className="prism-section-label prism-perspective-label">
-                      🔍 매체별 해석
-                    </div>
-                    <div className="prism-perspective-grid">
-                      {activePerspectives.map((p) => (
-                        <div className={`prism-perspective ${p.cls}`} key={p.key}>
-                          <div className="prism-perspective-head">
-                            <span className="prism-side-label">{p.label}</span>
-                            {(p.data.outlets || []).length > 0 && (
-                              <div className="prism-outlet-tags">
-                                {p.data.outlets.map((outlet, idx) => (
-                                  <span key={idx} className="prism-outlet-tag">
-                                    {outlet}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          <p className="prism-framing">{p.data.framing}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-
-                {/* 구버전 데이터 호환: facts/perspectives 없이 analysis만 있을 때 */}
-                {!hasFacts && activePerspectives.length === 0 && card.analysis && (
-                  <div className="prism-fact-box">
-                    <p className="prism-framing prism-framing-fallback">
-                      {card.analysis}
-                    </p>
-                  </div>
-                )}
-
-                {/* 원문 링크 */}
-                {card.sources && card.sources.length > 0 && (
-                  <div className="prism-card-sources">
-                    {card.sources
-                      .filter((s) => s.link)
-                      .map((source, idx) => (
-                        <a
-                          key={idx}
-                          href={source.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="prism-source-link"
-                        >
-                          {source.name} 원문 ↗
-                        </a>
-                      ))}
-                  </div>
-                )}
-              </article>
-            </section>
-          );
-        })}
+        {!loading && allCards.map((card) => renderCardArticle(card))}
       </div>
     );
   };
@@ -467,7 +507,7 @@ function App() {
       <div className="main-content">
         {category === 'about' && renderAboutPage()}
         {category === 'cards' && renderCardsPage()}
-        {category !== 'about' && category !== 'cards' && renderNewsPage()}
+        {category !== 'about' && category !== 'cards' && renderCategoryPage()}
       </div>
     </div>
   );

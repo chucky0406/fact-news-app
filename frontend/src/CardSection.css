@@ -1,20 +1,30 @@
 /* =========================================================
-   PRISM - 오늘의 카드 (풀스크린 세로 스와이프 피드)
+   PRISM - 카드 섹션 (분야별 카드 피드 + 뉴스 목록)
    prism- 접두사로 기존 App.css 와 충돌하지 않음
    ========================================================= */
 
-/* 피드 컨테이너 : 한 화면에 카드 한 장, 위로 스와이프 시 다음 카드로 스냅 */
-.prism-card-feed {
+/* 스크롤 컨테이너 */
+.prism-card-feed,
+.prism-category-view {
   width: 100%;
   overflow-y: scroll;
   overflow-x: hidden;
-  scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   background: #f2f3f5;
 }
-.prism-card-feed::-webkit-scrollbar {
+.prism-card-feed::-webkit-scrollbar,
+.prism-category-view::-webkit-scrollbar {
   display: none;
+}
+
+/* '오늘의 카드' : 카드만 있으므로 칼같이 스냅 */
+.prism-card-feed {
+  scroll-snap-type: y mandatory;
+}
+/* 분야 페이지 : 카드 아래 뉴스 목록이 이어지므로 부드럽게 스냅 */
+.prism-category-view {
+  scroll-snap-type: y proximity;
 }
 
 /* 카드 한 장이 차지하는 한 화면 */
@@ -210,6 +220,33 @@
 }
 .prism-source-link:hover {
   text-decoration: underline;
+}
+
+/* ── 분야 페이지 하단 뉴스 목록 ── */
+.prism-news-section {
+  background: #f2f3f5;
+  padding: 6px 0 44px;
+}
+.prism-news-heading {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1c1c1e;
+  padding: 20px 18px 8px;
+}
+.prism-news-empty {
+  text-align: center;
+  color: #8a8a8f;
+  font-size: 14px;
+  padding: 20px;
+}
+
+/* 카드 없는 분야 안내 */
+.prism-cards-empty-note {
+  text-align: center;
+  color: #8a8a8f;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 30px 20px 4px;
 }
 
 /* 로딩 / 빈 상태 */
