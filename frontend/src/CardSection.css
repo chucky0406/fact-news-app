@@ -398,9 +398,52 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+/* =========================================================
+   첫 페이지(홈) - 검은 배경 + 큰 회전 프리즘
+   - 12s 에 한 바퀴 (느리고 장중하게). 속도는 animation 의 12s 만 조절.
+   - 크기는 .prism-hero 의 width/height (지금 화면폭의 60%, 최대 290px).
+   ========================================================= */
+.prism-home {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 44%, #0b1020 0%, #000000 70%);
+}
+.prism-hero {
+  width: min(60vw, 290px);
+  height: min(60vw, 290px);
+  filter:
+    drop-shadow(0 0 26px rgba(120, 180, 255, 0.42))
+    drop-shadow(0 0 52px rgba(190, 140, 255, 0.22));
+  animation: prism-spin 12s linear infinite;
+}
+.prism-hero-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.prism-home-tagline {
+  margin: 26px 0 0;
+  padding: 0 24px;
+  font-size: 12.5px;
+  letter-spacing: 0.4px;
+  color: #6d7a90;
+  text-align: center;
+}
+
+/* 홈에서는 카테고리 바를 검게 처리해 검은 배경과 이어지게 한다 */
+.category-bar.home {
+  background: #000000 !important;
+}
+
 /* 모션 최소화 설정을 켠 사용자에게는 회전을 멈춤 */
 @media (prefers-reduced-motion: reduce) {
-  .prism-spinner {
+  .prism-spinner,
+  .prism-hero {
     animation: none;
   }
 }
