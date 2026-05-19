@@ -127,18 +127,21 @@
   margin-bottom: 0;
 }
 
-/* ── 매체별 해석 (진보 / 보수 / 해외 병치) ── */
+/* ── 매체별 해석 ──
+   보수 → 진보 → 해외 순으로 박스를 위에서 아래로 세로 정렬 */
 .prism-perspective-label {
   margin-bottom: 9px;
 }
 .prism-perspective-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 9px;
 }
 .prism-perspective {
+  width: 100%;
+  box-sizing: border-box;
   border-radius: 12px;
-  padding: 12px 13px;
+  padding: 13px 14px;
 }
 .prism-progressive {
   background: #eaf2fb;
@@ -150,15 +153,17 @@
   background: #e9f3e4;
 }
 
-/* 칸 머리: 성향 라벨 + 매체 태그 */
+/* 칸 머리: 성향 라벨 + 매체 태그 (한 줄에 나란히) */
 .prism-perspective-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 7px;
 }
 .prism-side-label {
-  display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  margin-bottom: 4px;
 }
 .prism-progressive .prism-side-label {
   color: #1c4a73;
@@ -199,7 +204,7 @@
 .prism-framing {
   margin: 0;
   font-size: 13.5px;
-  line-height: 1.6;
+  line-height: 1.62;
 }
 .prism-progressive .prism-framing {
   color: #1f4d78;

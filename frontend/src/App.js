@@ -5,12 +5,20 @@ import './CardSection.css';
 // 백엔드 API 주소 (URL이 바뀌면 이 한 줄만 수정하면 됩니다)
 const API_BASE = "https://fact-news-app-production.up.railway.app";
 
-// 카드 매체별 해석 칸 정의 (진보 / 보수 / 해외)
+// 카드 매체별 해석 칸 정의 (위에서부터 표시되는 순서: 보수 → 진보 → 해외)
+// 라벨 표현을 바꾸려면 아래 label 값만 수정하면 됩니다.
 const PERSPECTIVE_DEFS = [
-  { key: 'progressive', label: '진보', cls: 'prism-progressive' },
-  { key: 'conservative', label: '보수', cls: 'prism-conservative' },
+  { key: 'conservative', label: '보수 성향', cls: 'prism-conservative' },
+  { key: 'progressive', label: '진보 성향', cls: 'prism-progressive' },
   { key: 'foreign', label: '해외', cls: 'prism-foreign' }
 ];
+
+// 카드의 해석 풍부도 = 채워진 해석 칸(진보/보수/해외) 개수
+const cardRichness = (card) => {
+  const p = card.perspectives || {};
+  return ['progressive', 'conservative', 'foreign']
+    .filter((k) => p[k] && p[k].framing).length;
+};
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -202,7 +210,7 @@ function App() {
             </div>
           )}
 
-          {/* 매체별 해석 (진보 / 보수 / 해외) */}
+          {/* 매체별 해석 (보수 성향 → 진보 성향 → 해외, 세로 정렬) */}
           {activePerspectives.length > 0 && (
             <>
               <div className="prism-section-label prism-perspective-label">
@@ -322,7 +330,10 @@ function App() {
 
   // 분야 페이지 - 가로 스와이프 카드 + 그 아래 뉴스 목록
   const renderCategoryPage = () => {
-    const categoryCards = cards[category] || [];
+    // 해석이 풍부한 카드를 앞으로 정렬
+    const categoryCards = [...(cards[category] || [])].sort(
+      (a, b) => cardRichness(b) - cardRichness(a)
+    );
 
     return (
       <div
@@ -363,7 +374,7 @@ function App() {
     );
   };
 
-  // 오늘의 카드 - 모든 분야 카드를 가로 스와이프로
+  // 오늘의 카드 - 모든 분야 카드를 가로 스와이프로 (해석 풍부한 순)
   const renderCardsPage = () => {
     const categoryOrder = [
       'general', 'politics', 'economy', 'science', 'health',
@@ -374,6 +385,8 @@ function App() {
     categoryOrder.forEach((cat) => {
       (cards[cat] || []).forEach((card) => allCards.push(card));
     });
+    // 해석이 풍부한 카드를 앞으로 정렬
+    allCards.sort((a, b) => cardRichness(b) - cardRichness(a));
 
     if (loading || allCards.length === 0) {
       return (
