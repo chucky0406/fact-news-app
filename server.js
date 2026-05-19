@@ -11,10 +11,22 @@ require('dotenv').config();
 const app = express();
 app.use(cors());
 
-const parser = new Parser();
+// RSS 파서 (브라우저 User-Agent 지정 - 일부 사이트의 차단 회피)
+const parser = new Parser({
+  timeout: 10000,
+  headers: {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+      '(KHTML, like Gecko) Chrome/124.0 Safari/537.36'
+  }
+});
+
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
+
+// Claude 모델명 (모델이 바뀌면 이 한 줄만 수정)
+const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 // 데이터 저장 경로
 const DATA_DIR = path.join(__dirname, 'data');
@@ -25,47 +37,18 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// RSS 피드 URL
-const rssFeeds = {
-  general: [
-    'https://www.chosun.com/rss/',
-    'https://www.joongang.co.kr/rss/',
-    'https://www.khan.co.kr/rss/',
-    'https://www.hani.co.kr/rss/',
-    'https://www.donga.com/rss/'
-  ],
-  politics: [
-    'https://www.chosun.com/politics/rss/',
-    'https://www.khan.co.kr/politics/rss/'
-  ],
-  economy: [
-    'https://www.chosun.com/business/rss/',
-    'https://www.joongang.co.kr/economics/rss/'
-  ],
-  science: [
-    'https://www.chosun.com/science/rss/',
-    'https://www.khan.co.kr/science/rss/'
-  ],
-  health: [
-    'https://www.khan.co.kr/life/health/rss/',
-    'https://www.hani.co.kr/arti/health/rss/'
-  ],
-  international: [
-    'https://www.chosun.com/world/rss/',
-    'https://www.joongang.co.kr/international/rss/'
-  ],
-  sports: [
-    'https://www.chosun.com/sports/rss/',
-    'https://www.donga.com/sports/rss/'
-  ],
-  culture: [
-    'https://www.khan.co.kr/culture/rss/',
-    'https://www.hani.co.kr/arti/culture/rss/'
-  ],
-  popular: [
-    'https://www.chosun.com/rss/',
-    'https://www.joongang.co.kr/rss/'
-  ]
+// ===== 분야별 구글 뉴스 검색어 =====
+// 빈 문자열('')이면 구글 뉴스 한국판 메인 헤드라인을 가져옴
+const categoryQueries = {
+  general: '',
+  politics: '정치',
+  economy: '경제',
+  science: '과학 기술',
+  health: '의료 건강',
+  international: '국제',
+  sports: '스포츠',
+  culture: '문화 예술',
+  popular: '속보'
 };
 
 const categoryLabels = {
@@ -89,13 +72,13 @@ const mediaBias = {
   '경향': 'progressive',
   '오마이뉴스': 'progressive',
   '프레시안': 'progressive',
+  '미디어오늘': 'progressive',
   '조선일보': 'conservative',
-  '조선': 'conservative',
+  '조선비즈': 'conservative',
   '동아일보': 'conservative',
-  '동아': 'conservative',
   '중앙일보': 'conservative',
-  '중앙': 'conservative',
-  '문화일보': 'conservative'
+  '문화일보': 'conservative',
+  '세계일보': 'conservative'
 };
 
 function getSide(sourceName) {
@@ -112,36 +95,74 @@ function hasBothSides(group) {
   return sides.has('progressive') && sides.has('conservative');
 }
 
+// 언론사명 정규화 (영문/변형 표기를 한국어 표준명으로)
+function normalizeSource(name) {
+  if (!name) return '뉴스';
+  const cleaned = name.trim();
+  const map = {
+    'chosun': '조선일보',
+    'chosunbiz': '조선비즈',
+    'joongang': '중앙일보',
+    'korea joongang daily': '중앙일보',
+    'hankyoreh': '한겨레',
+    'donga': '동아일보',
+    'dong-a': '동아일보',
+    'kyunghyang': '경향신문',
+    'yonhap': '연합뉴스',
+    'ohmynews': '오마이뉴스',
+    'pressian': '프레시안'
+  };
+  const lower = cleaned.toLowerCase();
+  for (const key of Object.keys(map)) {
+    if (lower.includes(key)) return map[key];
+  }
+  return cleaned;
+}
+
 const NEWS_API_KEY = process.env.NEWS_API_KEY || 'your_api_key_here';
 
-// RSS 피드에서 뉴스 가져오기
-async function fetchRSSNews(urls) {
+// ===== 구글 뉴스 RSS에서 기사 가져오기 =====
+// 구글 뉴스는 안정적이며, 기사 제목 끝에 " - 언론사명" 형태로 출처를 제공
+async function fetchGoogleNews(query) {
+  const url = query
+    ? `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ko&gl=KR&ceid=KR:ko`
+    : `https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko`;
+
   const articles = [];
 
-  for (const url of urls) {
-    try {
-      const feed = await parser.parseURL(url);
+  try {
+    const feed = await parser.parseURL(url);
 
-      feed.items.slice(0, 5).forEach(item => {
-        articles.push({
-          id: `rss_${item.link}`,
-          title: item.title,
-          description: item.contentSnippet || item.summary || '',
-          link: item.link,
-          pubDate: item.pubDate,
-          source: extractSourceName(url),
-          type: 'rss'
-        });
+    feed.items.slice(0, 25).forEach(item => {
+      const rawTitle = (item.title || '').trim();
+      let title = rawTitle;
+      let source = '뉴스';
+
+      // 구글 뉴스 제목 형식: "기사 제목 - 언론사명"
+      const idx = rawTitle.lastIndexOf(' - ');
+      if (idx > 0) {
+        title = rawTitle.slice(0, idx).trim();
+        source = rawTitle.slice(idx + 3).trim();
+      }
+
+      articles.push({
+        id: `gn_${item.link}`,
+        title: title,
+        description: (item.contentSnippet || item.content || '').slice(0, 300),
+        link: item.link,
+        pubDate: item.pubDate || item.isoDate,
+        source: normalizeSource(source),
+        type: 'google'
       });
-    } catch (error) {
-      console.error(`RSS 피드 오류 (${url}):`, error.message);
-    }
+    });
+  } catch (error) {
+    console.error(`구글 뉴스 RSS 오류 (${query || '헤드라인'}):`, error.message);
   }
 
   return articles;
 }
 
-// News API에서 뉴스 가져오기
+// News API에서 뉴스 가져오기 (보조 소스)
 async function fetchNewsAPIArticles(category) {
   try {
     const queries = {
@@ -173,23 +194,13 @@ async function fetchNewsAPIArticles(category) {
       description: article.description || '',
       link: article.url,
       pubDate: article.publishedAt,
-      source: article.source.name,
+      source: normalizeSource(article.source.name),
       type: 'api'
     }));
   } catch (error) {
     console.error('News API 오류:', error.message);
     return [];
   }
-}
-
-// 신문사명 추출
-function extractSourceName(url) {
-  if (url.includes('chosun')) return '조선일보';
-  if (url.includes('joongang')) return '중앙일보';
-  if (url.includes('khan')) return '경향신문';
-  if (url.includes('hani')) return '한겨레';
-  if (url.includes('donga')) return '동아일보';
-  return '뉴스';
 }
 
 // 유사도 계산
@@ -244,7 +255,7 @@ async function generateObjectiveSummaryWithClaude(articles) {
       .join('\n\n---\n\n');
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: CLAUDE_MODEL,
       max_tokens: 500,
       messages: [
         {
@@ -269,7 +280,7 @@ async function generateStructuredCardAnalysis(articles) {
       .join('\n\n---\n\n');
 
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-sonnet-20241022',
+      model: CLAUDE_MODEL,
       max_tokens: 1024,
       messages: [
         {
@@ -322,14 +333,14 @@ ${articlesText}
 }
 
 // 뉴스 데이터 통합 및 정렬
-function mergeAndSortArticles(rssArticles, apiArticles) {
-  const merged = [...rssArticles, ...apiArticles];
+function mergeAndSortArticles(googleArticles, apiArticles) {
+  const merged = [...googleArticles, ...apiArticles];
 
   const unique = [];
   const seen = new Set();
 
   merged.forEach(article => {
-    if (!seen.has(article.title)) {
+    if (article.title && !seen.has(article.title)) {
       seen.add(article.title);
       unique.push(article);
     }
@@ -340,6 +351,19 @@ function mergeAndSortArticles(rssArticles, apiArticles) {
     const dateB = new Date(b.pubDate || 0);
     return dateB - dateA;
   }).slice(0, 30);
+}
+
+// 안전한 날짜 포맷
+function formatDate(value) {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) {
+    return new Date().toLocaleDateString('ko-KR', {
+      year: 'numeric', month: '2-digit', day: '2-digit'
+    });
+  }
+  return d.toLocaleDateString('ko-KR', {
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  });
 }
 
 // 매일 5시마다 실행되는 크론 작업
@@ -353,12 +377,11 @@ async function generateDailyCards() {
     console.log(`📰 ${categoryLabels[category]} 분야 처리 중...`);
 
     try {
-      // 뉴스 수집
-      const rssUrls = rssFeeds[category] || rssFeeds.general;
-      const rssNews = await fetchRSSNews(rssUrls);
+      // 뉴스 수집 (구글 뉴스 + News API)
+      const googleNews = await fetchGoogleNews(categoryQueries[category]);
       const apiNews = await fetchNewsAPIArticles(category);
 
-      const articles = mergeAndSortArticles(rssNews, apiNews);
+      const articles = mergeAndSortArticles(googleNews, apiNews);
 
       // 같은 기사 그룹화 + 좌·우 매체가 함께 있는 그룹 우선 정렬
       const groups = groupSimilarArticles(articles);
@@ -387,11 +410,7 @@ async function generateDailyCards() {
           category: category,
           categoryLabel: categoryLabels[category],
           title: group[0].title,
-          date: new Date(group[0].pubDate).toLocaleDateString('ko-KR', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit'
-          }),
+          date: formatDate(group[0].pubDate),
           facts: structured ? structured.facts : [],
           perspectives: {
             progressive: {
@@ -522,11 +541,10 @@ app.get('/api/news', async (req, res) => {
   const category = req.query.category || 'general';
 
   try {
-    const rssUrls = rssFeeds[category] || rssFeeds.general;
-    const rssNews = await fetchRSSNews(rssUrls);
+    const googleNews = await fetchGoogleNews(categoryQueries[category]);
     const apiNews = await fetchNewsAPIArticles(category);
 
-    const articles = mergeAndSortArticles(rssNews, apiNews);
+    const articles = mergeAndSortArticles(googleNews, apiNews);
     const groups = groupSimilarArticles(articles);
 
     const formattedArticles = [];
@@ -540,11 +558,7 @@ app.get('/api/news', async (req, res) => {
       formattedArticles.push({
         id: `group_${group[0].id}`,
         title: group[0].title,
-        date: new Date(group[0].pubDate).toLocaleDateString('ko-KR', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        }),
+        date: formatDate(group[0].pubDate),
         analysis: analysis,
         sources: group.map(article => ({
           name: article.source,
@@ -562,11 +576,7 @@ app.get('/api/news', async (req, res) => {
       formattedArticles.push({
         id: article.id,
         title: article.title,
-        date: new Date(article.pubDate).toLocaleDateString('ko-KR', {
-          year: 'numeric',
-          month: '2-digit',
-          day: '2-digit'
-        }),
+        date: formatDate(article.pubDate),
         analysis: null,
         sources: [{
           name: article.source,
@@ -598,7 +608,7 @@ app.get('/api/health', (req, res) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`\n🚀 PRISM 뉴스 서버 실행 중: http://localhost:${PORT}`);
-  console.log('📰 RSS + News API + Claude 분석 기능');
+  console.log('📰 구글 뉴스 RSS + News API + Claude 분석');
   console.log('⏰ 매일 오전 5시에 자동 카드 생성');
-  console.log('\n📌 테스트: http://localhost:3001/api/generate-now (GET/POST)\n');
+  console.log(`\n📌 테스트: http://localhost:${PORT}/api/generate-now (GET/POST)\n`);
 });
