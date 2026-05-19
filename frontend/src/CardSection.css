@@ -4,19 +4,6 @@
    prism- 접두사로 기존 App.css 와 충돌하지 않음
    ========================================================= */
 
-/* 분야 페이지 바깥 컨테이너 (세로 스크롤: 카드 영역 + 뉴스 목록) */
-.prism-category-view {
-  width: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  background: #f2f3f5;
-}
-.prism-category-view::-webkit-scrollbar {
-  display: none;
-}
-
 /* 카드 페이저 : 좌우로 넘기는 가로 스와이프 */
 .prism-card-pager {
   display: flex;
@@ -31,10 +18,6 @@
 }
 .prism-card-pager::-webkit-scrollbar {
   display: none;
-}
-/* 분야 페이지 안에서는 카드 영역이 화면 전체 높이를 차지 */
-.prism-category-view > .prism-card-pager {
-  height: 100%;
 }
 
 /* 카드 한 장 = 한 페이지. 내용이 길면 이 안에서 세로 스크롤 */
@@ -236,35 +219,9 @@
   text-decoration: underline;
 }
 
-/* ── 분야 페이지 하단 뉴스 목록 ── */
-.prism-news-section {
-  background: #f2f3f5;
-  padding: 6px 0 44px;
-}
-.prism-news-heading {
-  font-size: 15px;
-  font-weight: 700;
-  color: #1c1c1e;
-  padding: 20px 18px 8px;
-}
-.prism-news-empty {
-  text-align: center;
-  color: #8a8a8f;
-  font-size: 14px;
-  padding: 20px;
-}
-
-/* 카드 없는 분야 안내 */
+/* 로딩 / 빈 상태 - 카드 영역을 꽉 채워 가운데 정렬 */
+.prism-card-loading,
 .prism-cards-empty-note {
-  text-align: center;
-  color: #8a8a8f;
-  font-size: 14px;
-  line-height: 1.6;
-  padding: 30px 20px 4px;
-}
-
-/* 로딩 / 빈 상태 */
-.prism-card-loading {
   flex: 1 0 100%;
   width: 100%;
   height: 100%;

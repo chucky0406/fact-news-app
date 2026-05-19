@@ -24,7 +24,6 @@ const cardRichness = (card) => {
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [category, setCategory] = useState('general');
-  const [articles, setArticles] = useState([]);
   const [cards, setCards] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -45,27 +44,7 @@ function App() {
     cards: '오늘의 카드'
   };
 
-  // 분야 데이터 (뉴스 + 카드) 한 번에 가져오기
-  const fetchCategoryData = async (cat) => {
-    setLoading(true);
-    try {
-      const [newsRes, cardsRes] = await Promise.all([
-        fetch(`${API_BASE}/api/news?category=${cat}`).then((r) => r.json()).catch(() => null),
-        fetch(`${API_BASE}/api/cards`).then((r) => r.json()).catch(() => null)
-      ]);
-      setArticles(newsRes && newsRes.success ? newsRes.articles || [] : []);
-      if (cardsRes && cardsRes.success) {
-        setCards(cardsRes.cards || {});
-      }
-    } catch (error) {
-      console.error('데이터 조회 오류:', error);
-      setArticles([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 카드만 가져오기 ('오늘의 카드' 메뉴용)
+  // 카드 가져오기 (/api/cards 는 모든 분야 카드를 한 번에 반환)
   const fetchCards = async () => {
     setLoading(true);
     try {
@@ -82,16 +61,11 @@ function App() {
     }
   };
 
-  // 카테고리 변경 시
+  // 카테고리 변경 시 (about 외에는 모두 카드 데이터 사용)
   useEffect(() => {
     setMenuOpen(false);
-
     if (category === 'about') return;
-    if (category === 'cards') {
-      fetchCards();
-    } else {
-      fetchCategoryData(category);
-    }
+    fetchCards();
   }, [category]);
 
   // 카드 영역 높이 측정 (고정 헤더 높이를 빼고 남은 화면을 채움)
@@ -281,108 +255,34 @@ function App() {
     );
   };
 
-  // 뉴스 기사 목록 렌더링 (분야 페이지 하단)
-  const renderNewsList = () => {
-    if (articles.length === 0) {
-      return <div className="prism-news-empty">불러온 뉴스가 없습니다.</div>;
-    }
-    return (
-      <div className="news-grid">
-        {articles.map((article, index) => (
-          <div key={index} className="news-article">
-            <h2 className="article-title">{article.title}</h2>
-            <div className="article-meta">
-              <span className="article-date">{article.date}</span>
-            </div>
-
-            {article.analysis && (
-              <div className="summary-block">
-                <div className="summary-title">📋 객관적 분석</div>
-                <p className="summary-text">{article.analysis}</p>
-              </div>
-            )}
-
-            <div className="article-sources">
-              {article.sources.map((source, idx) => (
-                <div key={idx} className="source-block">
-                  <div className="source-header">
-                    {source.link ? (
-                      <a
-                        href={source.link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="source-name-link"
-                      >
-                        {source.name}
-                      </a>
-                    ) : (
-                      <span className="source-name">{source.name}</span>
-                    )}
-                  </div>
-                  <p className="source-content">{source.content}</p>
-                  {source.link && (
-                    <a
-                      href={source.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="source-link"
-                    >
-                      원문 보기 →
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  // 분야 페이지 - 가로 스와이프 카드 + 그 아래 뉴스 목록
-  const renderCategoryPage = () => {
-    // 해석이 풍부한 카드를 앞으로 정렬
-    const categoryCards = [...(cards[category] || [])].sort(
-      (a, b) => cardRichness(b) - cardRichness(a)
-    );
-
+  // 카드 페이저 (가로 스와이프) - 분야 페이지 / 오늘의 카드 공통
+  const renderCardPager = (cardList, emptyMessage) => {
     return (
       <div
-        className="prism-category-view"
+        className="prism-card-pager"
         ref={cardFeedRef}
         style={{ height: feedHeight }}
       >
         {loading && (
           <div className="prism-card-loading">불러오는 중입니다...</div>
         )}
-
-        {!loading && (
-          <>
-            {/* 이 분야의 카드 - 옆으로 넘기는 가로 스와이프 */}
-            {categoryCards.length > 0 && (
-              <div className="prism-card-pager">
-                {categoryCards.map((card) => renderCardPage(card))}
-              </div>
-            )}
-
-            {categoryCards.length === 0 && (
-              <div className="prism-cards-empty-note">
-                이 분야의 카드는 아직 없습니다.<br />
-                아래에서 최신 뉴스를 확인하세요.
-              </div>
-            )}
-
-            {/* 카드 아래 - 기존 뉴스 목록 */}
-            <div className="prism-news-section">
-              <div className="prism-news-heading">
-                📰 {categoryLabels[category]} 최신 뉴스
-              </div>
-              {renderNewsList()}
-            </div>
-          </>
+        {!loading && cardList.length === 0 && (
+          <div className="prism-cards-empty-note">{emptyMessage}</div>
         )}
+        {!loading &&
+          cardList.length > 0 &&
+          cardList.map((card) => renderCardPage(card))}
       </div>
     );
+  };
+
+  // 분야 페이지 - 이 분야의 카드만 가로 스와이프로 표시
+  const renderCategoryPage = () => {
+    // 해석이 풍부한 카드를 앞으로 정렬
+    const categoryCards = [...(cards[category] || [])].sort(
+      (a, b) => cardRichness(b) - cardRichness(a)
+    );
+    return renderCardPager(categoryCards, '이 분야의 카드는 아직 없습니다.');
   };
 
   // 오늘의 카드 - 모든 분야 카드를 가로 스와이프로 (해석 풍부한 순)
@@ -399,31 +299,7 @@ function App() {
     // 해석이 풍부한 카드를 앞으로 정렬
     allCards.sort((a, b) => cardRichness(b) - cardRichness(a));
 
-    if (loading || allCards.length === 0) {
-      return (
-        <div
-          className="prism-card-pager"
-          ref={cardFeedRef}
-          style={{ height: feedHeight }}
-        >
-          <div className="prism-card-loading">
-            {loading
-              ? '카드를 불러오는 중입니다...'
-              : '아직 생성된 카드가 없습니다.'}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div
-        className="prism-card-pager"
-        ref={cardFeedRef}
-        style={{ height: feedHeight }}
-      >
-        {allCards.map((card) => renderCardPage(card))}
-      </div>
-    );
+    return renderCardPager(allCards, '아직 생성된 카드가 없습니다.');
   };
 
   return (
