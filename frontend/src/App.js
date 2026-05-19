@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
+import './CardSection.css';
 
 // 백엔드 API 주소 (URL이 바뀌면 이 한 줄만 수정하면 됩니다)
 const API_BASE = "https://fact-news-app-production.up.railway.app";
@@ -10,6 +11,10 @@ function App() {
   const [articles, setArticles] = useState([]);
   const [cards, setCards] = useState({});
   const [loading, setLoading] = useState(false);
+
+  // 카드 스와이프 피드 높이 (고정 헤더 아래 남은 화면을 꽉 채움)
+  const cardFeedRef = useRef(null);
+  const [feedHeight, setFeedHeight] = useState('calc(100vh - 110px)');
 
   const categoryLabels = {
     general: '종합',
@@ -70,6 +75,26 @@ function App() {
       fetchNews(category);
     }
   }, [category]);
+
+  // 카드 피드 높이 측정 (고정 헤더 높이를 빼고 남은 화면을 채움)
+  useEffect(() => {
+    if (category !== 'cards') return;
+
+    const measure = () => {
+      const el = cardFeedRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      const h = window.innerHeight - top;
+      if (h > 0) setFeedHeight(`${Math.round(h)}px`);
+    };
+
+    const raf = requestAnimationFrame(measure);
+    window.addEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', measure);
+    };
+  }, [category, loading]);
 
   const handleMenuToggle = () => {
     setMenuOpen(!menuOpen);
@@ -193,76 +218,137 @@ function App() {
     </div>
   );
 
-  // 카드 페이지 렌더링
+  // 카드 페이지 렌더링 - 풀스크린 세로 스와이프 피드
   const renderCardsPage = () => {
     const categoryOrder = [
       'general', 'politics', 'economy', 'science', 'health',
       'international', 'sports', 'culture', 'popular'
     ];
 
+    // 모든 분야의 카드를 한 줄로 펼침
+    const allCards = [];
+    categoryOrder.forEach((cat) => {
+      (cards[cat] || []).forEach((card) => allCards.push(card));
+    });
+
     return (
-      <div className="cards-section">
-        <div className="cards-header">
-          <h2>📋 오늘의 카드</h2>
-          <p className="cards-date">
-            생성일: {cards.generatedAt ? new Date(cards.generatedAt).toLocaleDateString('ko-KR') : '로딩 중...'}
-          </p>
-        </div>
+      <div
+        className="prism-card-feed"
+        ref={cardFeedRef}
+        style={{ height: feedHeight }}
+      >
+        {loading && (
+          <div className="prism-card-loading">카드를 불러오는 중입니다...</div>
+        )}
 
-        {loading && <div className="loading">카드를 불러오는 중입니다...</div>}
-
-        {!loading && Object.keys(cards).length === 0 && (
-          <div className="loading">
+        {!loading && allCards.length === 0 && (
+          <div className="prism-card-loading">
             아직 생성된 카드가 없습니다.<br />
-            내일 오전 5시에 자동 생성됩니다.
+            매일 오전 5시에 자동 생성됩니다.
           </div>
         )}
 
-        {!loading && Object.keys(cards).length > 0 && (
-          <div className="cards-container">
-            {categoryOrder.map((cat) => {
-              const categoryCards = cards[cat] || [];
-              if (categoryCards.length === 0) return null;
+        {!loading && allCards.map((card) => {
+          const prog = card.perspectives && card.perspectives.progressive;
+          const cons = card.perspectives && card.perspectives.conservative;
+          const hasProg = !!(prog && prog.framing);
+          const hasCons = !!(cons && cons.framing);
 
-              return (
-                <div key={cat} className="category-cards">
-                  <h3 className="category-cards-title">
-                    {categoryLabels[cat]}
-                  </h3>
-                  <div className="cards-grid">
-                    {categoryCards.map((card) => (
-                      <div key={card.id} className="card-item">
-                        <h4 className="card-title">{card.title}</h4>
-                        <p className="card-date">{card.date}</p>
-
-                        {card.analysis && (
-                          <div className="card-analysis">
-                            <p>{card.analysis}</p>
-                          </div>
-                        )}
-
-                        <div className="card-sources">
-                          {card.sources.map((source, idx) => (
-                            <a
-                              key={idx}
-                              href={source.link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="card-source-link"
-                              title={source.name}
-                            >
-                              {source.name}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+          return (
+            <section className="prism-card-screen" key={card.id}>
+              <article className="prism-card">
+                <div className="prism-card-top">
+                  <span className="prism-card-cat">
+                    {card.categoryLabel || categoryLabels[card.category] || ''}
+                  </span>
+                  <span className="prism-card-date">{card.date}</span>
                 </div>
-              );
-            })}
-          </div>
-        )}
+
+                <h2 className="prism-card-title">{card.title}</h2>
+
+                {/* 확인된 사실 */}
+                {card.facts && card.facts.length > 0 && (
+                  <div className="prism-fact-box">
+                    <div className="prism-section-label">📌 확인된 사실</div>
+                    <ul className="prism-fact-list">
+                      {card.facts.map((fact, idx) => (
+                        <li key={idx}>{fact}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* 매체별 해석 (좌·우 병치) */}
+                {(hasProg || hasCons) && (
+                  <>
+                    <div className="prism-section-label prism-perspective-label">
+                      🔍 매체별 해석
+                    </div>
+                    <div className="prism-perspective-grid">
+                      {hasProg && (
+                        <div className="prism-perspective prism-progressive">
+                          {(prog.outlets || []).length > 0 && (
+                            <div className="prism-outlet-tags">
+                              {prog.outlets.map((outlet, idx) => (
+                                <span key={idx} className="prism-outlet-tag">
+                                  {outlet}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <p className="prism-framing">{prog.framing}</p>
+                        </div>
+                      )}
+                      {hasCons && (
+                        <div className="prism-perspective prism-conservative">
+                          {(cons.outlets || []).length > 0 && (
+                            <div className="prism-outlet-tags">
+                              {cons.outlets.map((outlet, idx) => (
+                                <span key={idx} className="prism-outlet-tag">
+                                  {outlet}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <p className="prism-framing">{cons.framing}</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* 구버전 데이터 호환: facts/perspectives 없이 analysis만 있을 때 */}
+                {(!card.facts || card.facts.length === 0) &&
+                  !hasProg && !hasCons && card.analysis && (
+                    <div className="prism-fact-box">
+                      <p className="prism-framing prism-framing-fallback">
+                        {card.analysis}
+                      </p>
+                    </div>
+                  )}
+
+                {/* 원문 링크 */}
+                {card.sources && card.sources.length > 0 && (
+                  <div className="prism-card-sources">
+                    {card.sources
+                      .filter((s) => s.link)
+                      .map((source, idx) => (
+                        <a
+                          key={idx}
+                          href={source.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="prism-source-link"
+                        >
+                          {source.name} 원문 ↗
+                        </a>
+                      ))}
+                  </div>
+                )}
+              </article>
+            </section>
+          );
+        })}
       </div>
     );
   };

@@ -80,16 +80,48 @@ const categoryLabels = {
   popular: '인기'
 };
 
+// ===== 매체 정치 성향 분류 =====
+// AllSides 방식의 좌·우 병치를 위해 사용. 분류 기준은 자유롭게 수정 가능.
+// 중앙일보는 통상 중도~보수로 분류되나, 본 앱에서는 2단 비교를 위해 보수로 묶음.
+const mediaBias = {
+  '한겨레': 'progressive',
+  '경향신문': 'progressive',
+  '경향': 'progressive',
+  '오마이뉴스': 'progressive',
+  '프레시안': 'progressive',
+  '조선일보': 'conservative',
+  '조선': 'conservative',
+  '동아일보': 'conservative',
+  '동아': 'conservative',
+  '중앙일보': 'conservative',
+  '중앙': 'conservative',
+  '문화일보': 'conservative'
+};
+
+function getSide(sourceName) {
+  if (!sourceName) return 'unknown';
+  for (const key of Object.keys(mediaBias)) {
+    if (sourceName.includes(key)) return mediaBias[key];
+  }
+  return 'unknown';
+}
+
+// 그룹이 진보·보수 매체를 모두 포함하는지
+function hasBothSides(group) {
+  const sides = new Set(group.map(a => getSide(a.source)));
+  return sides.has('progressive') && sides.has('conservative');
+}
+
 const NEWS_API_KEY = process.env.NEWS_API_KEY || 'your_api_key_here';
 
 // RSS 피드에서 뉴스 가져오기
 async function fetchRSSNews(urls) {
   const articles = [];
-  
+
   for (const url of urls) {
     try {
       const feed = await parser.parseURL(url);
-      
+
       feed.items.slice(0, 5).forEach(item => {
         articles.push({
           id: `rss_${item.link}`,
@@ -105,7 +137,7 @@ async function fetchRSSNews(urls) {
       console.error(`RSS 피드 오류 (${url}):`, error.message);
     }
   }
-  
+
   return articles;
 }
 
@@ -164,14 +196,14 @@ function extractSourceName(url) {
 function calculateSimilarity(str1, str2) {
   const words1 = str1.toLowerCase().split(' ');
   const words2 = str2.toLowerCase().split(' ');
-  
+
   let matches = 0;
   words1.forEach(w1 => {
     if (words2.some(w2 => w2.includes(w1) || w1.includes(w2))) {
       matches++;
     }
   });
-  
+
   return matches / Math.max(words1.length, words2.length);
 }
 
@@ -179,38 +211,38 @@ function calculateSimilarity(str1, str2) {
 function groupSimilarArticles(articles) {
   const groups = [];
   const used = new Set();
-  
+
   articles.forEach((article, index) => {
     if (used.has(index)) return;
-    
+
     const group = [article];
     used.add(index);
-    
+
     articles.forEach((other, otherIndex) => {
       if (used.has(otherIndex)) return;
-      
+
       const similarity = calculateSimilarity(article.title, other.title);
       if (similarity > 0.5) {
         group.push(other);
         used.add(otherIndex);
       }
     });
-    
+
     if (group.length >= 2) {
       groups.push(group);
     }
   });
-  
+
   return groups;
 }
 
-// Claude로 객관적 요약 및 관점 분석
+// Claude로 객관적 요약 및 관점 분석 (기존 /api/news 용 - 유지)
 async function generateObjectiveSummaryWithClaude(articles) {
   try {
     const articlesText = articles
       .map(a => `[${a.source}]\n제목: ${a.title}\n내용: ${a.description}`)
       .join('\n\n---\n\n');
-    
+
     const message = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20241022',
       max_tokens: 500,
@@ -221,7 +253,7 @@ async function generateObjectiveSummaryWithClaude(articles) {
         }
       ]
     });
-    
+
     return message.content[0].text;
   } catch (error) {
     console.error('Claude API 오류:', error.message);
@@ -229,20 +261,80 @@ async function generateObjectiveSummaryWithClaude(articles) {
   }
 }
 
+// ===== 카드 전용: 구조화된 분석 (사실 / 좌·우 해석 분리) =====
+async function generateStructuredCardAnalysis(articles) {
+  try {
+    const articlesText = articles
+      .map(a => `[${a.source}]\n제목: ${a.title}\n내용: ${a.description || ''}`)
+      .join('\n\n---\n\n');
+
+    const message = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 1024,
+      messages: [
+        {
+          role: 'user',
+          content:
+`다음은 같은 사건에 대한 여러 신문사의 기사입니다.
+매체 정치 성향 참고 - 진보 성향: 한겨레, 경향신문, 오마이뉴스 / 보수 성향: 조선일보, 동아일보, 중앙일보
+
+${articlesText}
+
+위 기사들을 분석해 아래 JSON 형식으로만 응답하세요. 코드블록(\`\`\`)이나 그 외 설명 없이 순수 JSON만 출력합니다.
+
+{
+  "facts": ["여러 매체가 공통으로 전한 검증 가능한 핵심 사실. 해석·평가·전망을 배제하고 '무슨 일이 있었는가'만. 항목당 한 문장으로 간결하게. 최대 3개."],
+  "perspectives": {
+    "progressive": "진보 성향 매체들이 이 사건에서 무엇을 강조하고 어떤 의미를 부여했는지 2문장 이내로 중립적으로 기술. 진보 성향 기사가 없으면 빈 문자열.",
+    "conservative": "보수 성향 매체들이 이 사건에서 무엇을 강조하고 어떤 의미를 부여했는지 2문장 이내로 중립적으로 기술. 보수 성향 기사가 없으면 빈 문자열."
+  }
+}
+
+원칙:
+- 어느 쪽이 옳은지 판단하지 말 것. 차이 자체만 드러낼 것.
+- facts(사실)와 perspectives(해석)를 명확히 분리할 것.
+- facts에 형용사적 평가나 어조를 섞지 말 것.`
+        }
+      ]
+    });
+
+    let text = (message.content[0].text || '').trim();
+    text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1) {
+      text = text.slice(start, end + 1);
+    }
+
+    const parsed = JSON.parse(text);
+    return {
+      facts: Array.isArray(parsed.facts) ? parsed.facts.slice(0, 3) : [],
+      perspectives: {
+        progressive: (parsed.perspectives && parsed.perspectives.progressive) || '',
+        conservative: (parsed.perspectives && parsed.perspectives.conservative) || ''
+      }
+    };
+  } catch (error) {
+    console.error('Claude 구조화 분석 오류:', error.message);
+    return null;
+  }
+}
+
 // 뉴스 데이터 통합 및 정렬
 function mergeAndSortArticles(rssArticles, apiArticles) {
   const merged = [...rssArticles, ...apiArticles];
-  
+
   const unique = [];
   const seen = new Set();
-  
+
   merged.forEach(article => {
     if (!seen.has(article.title)) {
       seen.add(article.title);
       unique.push(article);
     }
   });
-  
+
   return unique.sort((a, b) => {
     const dateA = new Date(a.pubDate || 0);
     const dateB = new Date(b.pubDate || 0);
@@ -253,35 +345,43 @@ function mergeAndSortArticles(rssArticles, apiArticles) {
 // 매일 5시마다 실행되는 크론 작업
 async function generateDailyCards() {
   console.log('\n✨ [' + new Date().toLocaleString('ko-KR') + '] 자동 카드 생성 시작...');
-  
+
   const allCards = {};
   const categories = Object.keys(categoryLabels);
-  
+
   for (const category of categories) {
     console.log(`📰 ${categoryLabels[category]} 분야 처리 중...`);
-    
+
     try {
       // 뉴스 수집
       const rssUrls = rssFeeds[category] || rssFeeds.general;
       const rssNews = await fetchRSSNews(rssUrls);
       const apiNews = await fetchNewsAPIArticles(category);
-      
+
       const articles = mergeAndSortArticles(rssNews, apiNews);
-      
-      // 같은 기사 그룹화
+
+      // 같은 기사 그룹화 + 좌·우 매체가 함께 있는 그룹 우선 정렬
       const groups = groupSimilarArticles(articles);
-      
-      // 그룹별 Claude 분석
+      groups.sort((a, b) => (hasBothSides(b) ? 1 : 0) - (hasBothSides(a) ? 1 : 0));
+
+      // 그룹별 Claude 구조화 분석
       const cards = [];
-      
+
       for (let i = 0; i < Math.min(10, groups.length); i++) {
         const group = groups[i];
-        let analysis = null;
-        
+        let structured = null;
+
         if (process.env.ANTHROPIC_API_KEY) {
-          analysis = await generateObjectiveSummaryWithClaude(group);
+          structured = await generateStructuredCardAnalysis(group);
         }
-        
+
+        const progressiveOutlets = [
+          ...new Set(group.filter(a => getSide(a.source) === 'progressive').map(a => a.source))
+        ];
+        const conservativeOutlets = [
+          ...new Set(group.filter(a => getSide(a.source) === 'conservative').map(a => a.source))
+        ];
+
         cards.push({
           id: `${category}_${i}_${Date.now()}`,
           category: category,
@@ -292,35 +392,46 @@ async function generateDailyCards() {
             month: '2-digit',
             day: '2-digit'
           }),
-          analysis: analysis,
+          facts: structured ? structured.facts : [],
+          perspectives: {
+            progressive: {
+              outlets: progressiveOutlets,
+              framing: structured ? structured.perspectives.progressive : ''
+            },
+            conservative: {
+              outlets: conservativeOutlets,
+              framing: structured ? structured.perspectives.conservative : ''
+            }
+          },
           sources: group.map(article => ({
             name: article.source,
+            side: getSide(article.source),
             content: article.description || article.title,
             link: article.link
           })),
           createdAt: new Date().toISOString()
         });
-        
+
         // API 요청 간 딜레이 (rate limiting)
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
-      
+
       allCards[category] = cards;
       console.log(`✅ ${categoryLabels[category]}: ${cards.length}개 카드 생성`);
-      
+
     } catch (error) {
       console.error(`❌ ${categoryLabels[category]} 오류:`, error.message);
       allCards[category] = [];
     }
   }
-  
+
   // 결과 저장
   try {
     fs.writeFileSync(CARDS_FILE, JSON.stringify({
       generatedAt: new Date().toISOString(),
       cards: allCards
     }, null, 2));
-    
+
     console.log(`\n🎉 자동 카드 생성 완료! (${CARDS_FILE})`);
     console.log(`총 ${Object.values(allCards).flat().length}개 카드 생성됨`);
   } catch (error) {
@@ -347,7 +458,7 @@ app.get('/api/cards', (req, res) => {
         cards: {}
       });
     }
-    
+
     const data = JSON.parse(fs.readFileSync(CARDS_FILE, 'utf-8'));
     res.json({
       success: true,
@@ -366,7 +477,7 @@ app.get('/api/cards', (req, res) => {
 app.get('/api/cards/:category', (req, res) => {
   try {
     const { category } = req.params;
-    
+
     if (!fs.existsSync(CARDS_FILE)) {
       return res.json({
         success: true,
@@ -374,10 +485,10 @@ app.get('/api/cards/:category', (req, res) => {
         cards: []
       });
     }
-    
+
     const data = JSON.parse(fs.readFileSync(CARDS_FILE, 'utf-8'));
     const cards = data.cards[category] || [];
-    
+
     res.json({
       success: true,
       category: category,
@@ -409,23 +520,23 @@ app.post('/api/generate-now', async (req, res) => {
 // 기존 뉴스 조회 엔드포인트 (호환성 유지)
 app.get('/api/news', async (req, res) => {
   const category = req.query.category || 'general';
-  
+
   try {
     const rssUrls = rssFeeds[category] || rssFeeds.general;
     const rssNews = await fetchRSSNews(rssUrls);
     const apiNews = await fetchNewsAPIArticles(category);
-    
+
     const articles = mergeAndSortArticles(rssNews, apiNews);
     const groups = groupSimilarArticles(articles);
-    
+
     const formattedArticles = [];
-    
+
     for (const group of groups) {
       let analysis = null;
       if (process.env.ANTHROPIC_API_KEY) {
         analysis = await generateObjectiveSummaryWithClaude(group);
       }
-      
+
       formattedArticles.push({
         id: `group_${group[0].id}`,
         title: group[0].title,
@@ -442,11 +553,11 @@ app.get('/api/news', async (req, res) => {
         }))
       });
     }
-    
+
     const ungroupedArticles = articles.filter(
       article => !groups.flat().find(a => a.id === article.id)
     );
-    
+
     ungroupedArticles.forEach(article => {
       formattedArticles.push({
         id: article.id,
@@ -464,7 +575,7 @@ app.get('/api/news', async (req, res) => {
         }]
       });
     });
-    
+
     res.json({
       success: true,
       articles: formattedArticles,
