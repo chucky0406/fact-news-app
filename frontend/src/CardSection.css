@@ -399,11 +399,14 @@
   to { transform: rotate(360deg); }
 }
 /* =========================================================
-   첫 페이지(홈) - 검은 배경 + 큰 회전 프리즘
-   - 12s 에 한 바퀴 (느리고 장중하게). 속도는 animation 의 12s 만 조절.
-   - 크기는 .prism-hero 의 width/height (지금 화면폭의 60%, 최대 290px).
+   첫 페이지(홈) - 검은 배경 + 입체 회전 프리즘
+   - 화면이 위아래로 움직이지 않도록 고정 (overflow/touch 잠금).
+   - 프리즘은 3개의 유리 면으로 된 삼각기둥. Y축으로 입체 회전.
+   - 회전 속도는 .prism3d 의 animation 14s 만 조절.
+   - 크기는 .prism3d 와 .prism3d-face 의 px 값으로 조절.
    ========================================================= */
 .prism-home {
+  position: relative;
   width: 100%;
   box-sizing: border-box;
   display: flex;
@@ -411,28 +414,115 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 44%, #0b1020 0%, #000000 70%);
+  overscroll-behavior: none;
+  touch-action: none;
+  background: radial-gradient(
+    circle at 50% 42%,
+    #111a30 0%,
+    #05070d 58%,
+    #000000 100%
+  );
 }
+
+/* 프리즘 무대 - 원근감 부여 */
 .prism-hero {
-  width: min(60vw, 290px);
-  height: min(60vw, 290px);
-  filter:
-    drop-shadow(0 0 26px rgba(120, 180, 255, 0.42))
-    drop-shadow(0 0 52px rgba(190, 140, 255, 0.22));
-  animation: prism-spin 12s linear infinite;
+  position: relative;
+  width: min(64vw, 300px);
+  height: min(64vw, 300px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 850px;
 }
-.prism-hero-svg {
-  display: block;
-  width: 100%;
-  height: 100%;
+/* 뒤쪽 은은한 빛무리 */
+.prism-hero-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 80%;
+  height: 80%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(130, 175, 255, 0.34) 0%,
+    rgba(155, 120, 225, 0.16) 45%,
+    rgba(0, 0, 0, 0) 72%
+  );
+  filter: blur(16px);
 }
+
+/* 삼각기둥 본체 - 3개의 유리 면이 Y축으로 입체 회전 */
+.prism3d {
+  position: relative;
+  width: 190px;
+  height: 190px;
+  transform-style: preserve-3d;
+  animation: prism-spin3d 14s linear infinite;
+}
+.prism3d-face {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 160px;
+  height: 92px;
+  margin-left: -80px;
+  margin-top: -46px;
+  box-sizing: border-box;
+  border: 1.5px solid rgba(255, 255, 255, 0.72);
+}
+.prism3d-face-1 {
+  transform: rotateZ(0deg) translateY(46px) rotateX(90deg);
+  background: linear-gradient(
+    160deg,
+    rgba(150, 210, 255, 0.30),
+    rgba(150, 210, 255, 0.05)
+  );
+}
+.prism3d-face-2 {
+  transform: rotateZ(120deg) translateY(46px) rotateX(90deg);
+  background: linear-gradient(
+    160deg,
+    rgba(205, 170, 255, 0.30),
+    rgba(205, 170, 255, 0.05)
+  );
+}
+.prism3d-face-3 {
+  transform: rotateZ(240deg) translateY(46px) rotateX(90deg);
+  background: linear-gradient(
+    160deg,
+    rgba(255, 220, 165, 0.24),
+    rgba(255, 220, 165, 0.05)
+  );
+}
+@keyframes prism-spin3d {
+  from { transform: rotateX(16deg) rotateY(0deg); }
+  to   { transform: rotateX(16deg) rotateY(360deg); }
+}
+
+/* 프리즘 아래 태그라인 */
 .prism-home-tagline {
-  margin: 26px 0 0;
+  margin: 30px 0 0;
   padding: 0 24px;
   font-size: 12.5px;
   letter-spacing: 0.4px;
   color: #6d7a90;
   text-align: center;
+}
+
+/* 첫 페이지 하단 - curated by FOREB */
+.prism-home-credit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 26px;
+  text-align: center;
+  font-size: 11.5px;
+  letter-spacing: 0.4px;
+  color: rgba(255, 255, 255, 0.42);
+}
+.prism-home-credit .foreb-mark {
+  color: rgba(255, 255, 255, 0.92);
 }
 
 /* 홈에서는 카테고리 바를 검게 처리해 검은 배경과 이어지게 한다 */
@@ -443,7 +533,7 @@
 /* 모션 최소화 설정을 켠 사용자에게는 회전을 멈춤 */
 @media (prefers-reduced-motion: reduce) {
   .prism-spinner,
-  .prism-hero {
+  .prism3d {
     animation: none;
   }
 }

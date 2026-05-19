@@ -97,7 +97,7 @@ function App() {
     setCategory(newCategory);
   };
 
-  // 첫 페이지(홈) - 검은 배경에 큰 프리즘이 회전
+  // 첫 페이지(홈) - 검은 배경에 입체 회전 프리즘 (3개 유리 면의 삼각기둥)
   const renderHomePage = () => (
     <div
       className="prism-home"
@@ -105,68 +105,19 @@ function App() {
       style={{ height: feedHeight }}
     >
       <div className="prism-hero" aria-hidden="true">
-        <svg
-          className="prism-hero-svg"
-          viewBox="0 0 240 240"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <linearGradient id="prismFacetA" x1="0" y1="0" x2="0.8" y2="1">
-              <stop offset="0%" stopColor="#bfe4ff" stopOpacity="0.62" />
-              <stop offset="100%" stopColor="#2e5a86" stopOpacity="0.12" />
-            </linearGradient>
-            <linearGradient id="prismFacetB" x1="1" y1="0" x2="0.2" y2="1">
-              <stop offset="0%" stopColor="#dcc4ff" stopOpacity="0.62" />
-              <stop offset="100%" stopColor="#4a3a72" stopOpacity="0.12" />
-            </linearGradient>
-            <linearGradient id="prismFacetC" x1="0.5" y1="1" x2="0.5" y2="0">
-              <stop offset="0%" stopColor="#ffe6c0" stopOpacity="0.50" />
-              <stop offset="100%" stopColor="#6e5638" stopOpacity="0.10" />
-            </linearGradient>
-          </defs>
-          {/* 세 면(facet) - 면마다 다른 스펙트럼 톤의 유리 */}
-          <path d="M120 25 L37.7 167.5 L120 120 Z" fill="url(#prismFacetA)" />
-          <path d="M120 25 L202.3 167.5 L120 120 Z" fill="url(#prismFacetB)" />
-          <path d="M37.7 167.5 L202.3 167.5 L120 120 Z" fill="url(#prismFacetC)" />
-          {/* 내부 모서리 - 면 분할 */}
-          <path
-            d="M120 25 L120 120 M37.7 167.5 L120 120 M202.3 167.5 L120 120"
-            stroke="#ffffff"
-            strokeOpacity="0.30"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-          {/* 바깥 윤곽 */}
-          <path
-            d="M120 25 L202.3 167.5 L37.7 167.5 Z"
-            fill="none"
-            stroke="#ffffff"
-            strokeOpacity="0.9"
-            strokeWidth="2.4"
-            strokeLinejoin="round"
-          />
-          {/* 광택 글린트 */}
-          <path
-            d="M120 25 L72 108"
-            fill="none"
-            stroke="#ffffff"
-            strokeOpacity="0.95"
-            strokeWidth="2.6"
-            strokeLinecap="round"
-          />
-          <path
-            d="M120 25 L120 92"
-            fill="none"
-            stroke="#ffffff"
-            strokeOpacity="0.55"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-          />
-        </svg>
+        <div className="prism-hero-glow"></div>
+        <div className="prism3d">
+          <div className="prism3d-face prism3d-face-1"></div>
+          <div className="prism3d-face prism3d-face-2"></div>
+          <div className="prism3d-face prism3d-face-3"></div>
+        </div>
       </div>
       <p className="prism-home-tagline">
         News beyond bias: for you and for your kids.
       </p>
+      <div className="prism-home-credit">
+        curated by <span className="foreb-mark">FOREB</span>
+      </div>
     </div>
   );
 
@@ -421,44 +372,46 @@ function App() {
           </button>
         </div>
         <div className="navbar-center">
-          <div className="prism-spinner" aria-hidden="true">
-            <svg
-              className="prism-spinner-svg"
-              viewBox="0 0 48 48"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              {/* 세 면(facet) - 빛을 받아 면마다 다른 스펙트럼 톤 */}
-              <path d="M24 6 L8.4 33 L24 24 Z" fill="#8fd3ff" fillOpacity="0.30" />
-              <path d="M24 6 L39.6 33 L24 24 Z" fill="#caa6ff" fillOpacity="0.30" />
-              <path d="M8.4 33 L39.6 33 L24 24 Z" fill="#ffd9a0" fillOpacity="0.22" />
-              {/* 내부 모서리 - 면 분할 */}
-              <path
-                d="M24 6 L24 24 M8.4 33 L24 24 M39.6 33 L24 24"
-                stroke="#ffffff"
-                strokeOpacity="0.32"
-                strokeWidth="1"
-                strokeLinecap="round"
-              />
-              {/* 바깥 윤곽 */}
-              <path
-                d="M24 6 L39.6 33 L8.4 33 Z"
-                fill="none"
-                stroke="#ffffff"
-                strokeOpacity="0.92"
-                strokeWidth="1.7"
-                strokeLinejoin="round"
-              />
-              {/* 유리 광택 (모서리 글린트) */}
-              <path
-                d="M24 6 L16.6 18.8"
-                fill="none"
-                stroke="#ffffff"
-                strokeOpacity="0.95"
-                strokeWidth="1.7"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
+          {category !== 'home' && (
+            <div className="prism-spinner" aria-hidden="true">
+              <svg
+                className="prism-spinner-svg"
+                viewBox="0 0 48 48"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                {/* 세 면(facet) - 빛을 받아 면마다 다른 스펙트럼 톤 */}
+                <path d="M24 6 L8.4 33 L24 24 Z" fill="#8fd3ff" fillOpacity="0.30" />
+                <path d="M24 6 L39.6 33 L24 24 Z" fill="#caa6ff" fillOpacity="0.30" />
+                <path d="M8.4 33 L39.6 33 L24 24 Z" fill="#ffd9a0" fillOpacity="0.22" />
+                {/* 내부 모서리 - 면 분할 */}
+                <path
+                  d="M24 6 L24 24 M8.4 33 L24 24 M39.6 33 L24 24"
+                  stroke="#ffffff"
+                  strokeOpacity="0.32"
+                  strokeWidth="1"
+                  strokeLinecap="round"
+                />
+                {/* 바깥 윤곽 */}
+                <path
+                  d="M24 6 L39.6 33 L8.4 33 Z"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeOpacity="0.92"
+                  strokeWidth="1.7"
+                  strokeLinejoin="round"
+                />
+                {/* 유리 광택 (모서리 글린트) */}
+                <path
+                  d="M24 6 L16.6 18.8"
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeOpacity="0.95"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </div>
+          )}
         </div>
         <div className="navbar-right">
           <button className="user-btn">👤</button>
@@ -535,7 +488,7 @@ function App() {
             className={`dropdown-link ${category === 'cards' ? 'active' : ''}`}
             onClick={() => handleCategoryChange('cards')}
           >
-            📋 오늘의 카드
+            오늘의 카드
           </button>
 
           <button
