@@ -5,12 +5,13 @@ import './CardSection.css';
 // 백엔드 API 주소 (URL이 바뀌면 이 한 줄만 수정하면 됩니다)
 const API_BASE = "https://fact-news-app-production.up.railway.app";
 
-// 카드 매체별 해석 칸 정의 (위에서부터 표시되는 순서: 보수 → 진보 → 해외)
-// 라벨 표현을 바꾸려면 아래 label 값만 수정하면 됩니다.
+// 카드 매체별 해석 칸 (위에서부터 표시되는 순서)
+// 정치 라벨('보수/진보')을 붙이지 않는다. 박스 머리에는 그 사건을 보도한
+// 매체 이름만 표시하고, 분류는 독자에게 맡긴다. 해외 박스만 '해외' 표시를 단다.
 const PERSPECTIVE_DEFS = [
-  { key: 'conservative', label: '보수 성향', cls: 'prism-conservative' },
-  { key: 'progressive', label: '진보 성향', cls: 'prism-progressive' },
-  { key: 'foreign', label: '해외', cls: 'prism-foreign' }
+  { key: 'conservative', cls: 'prism-conservative' },
+  { key: 'progressive', cls: 'prism-progressive' },
+  { key: 'foreign', cls: 'prism-foreign', marker: '해외' }
 ];
 
 // 카드의 해석 풍부도 = 채워진 해석 칸(진보/보수/해외) 개수
@@ -182,7 +183,13 @@ function App() {
         ...def,
         data: card.perspectives && card.perspectives[def.key]
       }))
-      .filter((p) => p.data && p.data.framing);
+      .filter((p) => {
+        if (!p.data || !p.data.framing) return false;
+        // 매체 이름이 곧 라벨이므로, 보도 매체가 없으면 표시하지 않는다
+        // (해외 박스는 '해외' 표시가 있어 예외)
+        const hasOutlets = p.data.outlets && p.data.outlets.length > 0;
+        return hasOutlets || Boolean(p.marker);
+      });
 
     const hasFacts = card.facts && card.facts.length > 0;
 
@@ -210,7 +217,7 @@ function App() {
             </div>
           )}
 
-          {/* 매체별 해석 (보수 성향 → 진보 성향 → 해외, 세로 정렬) */}
+          {/* 매체별 해석 - 박스 머리에 보도 매체 이름만 표시 (정치 라벨 없음) */}
           {activePerspectives.length > 0 && (
             <>
               <div className="prism-section-label prism-perspective-label">
@@ -220,7 +227,11 @@ function App() {
                 {activePerspectives.map((p) => (
                   <div className={`prism-perspective ${p.cls}`} key={p.key}>
                     <div className="prism-perspective-head">
-                      <span className="prism-side-label">{p.label}</span>
+                      {p.marker && (
+                        <span className="prism-perspective-marker">
+                          {p.marker}
+                        </span>
+                      )}
                       {(p.data.outlets || []).length > 0 && (
                         <div className="prism-outlet-tags">
                           {p.data.outlets.map((outlet, idx) => (

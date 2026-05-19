@@ -128,7 +128,9 @@
 }
 
 /* ── 매체별 해석 ──
-   보수 → 진보 → 해외 순으로 박스를 위에서 아래로 세로 정렬 */
+   정치 라벨 없이, 박스 머리에는 보도 매체 이름만 표시.
+   박스 색(은은한 톤 차이)만 시각적 구분으로 둔다.
+   위에서 아래로 한 칸씩 세로 정렬. */
 .prism-perspective-label {
   margin-bottom: 9px;
 }
@@ -153,38 +155,35 @@
   background: #e9f3e4;
 }
 
-/* 칸 머리: 성향 라벨 + 매체 태그 (한 줄에 나란히) */
+/* 칸 머리: 매체 이름 태그 (해외 박스는 '해외' 표시가 앞에 붙음) */
 .prism-perspective-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  margin-bottom: 7px;
-}
-.prism-side-label {
-  font-size: 12px;
-  font-weight: 700;
-}
-.prism-progressive .prism-side-label {
-  color: #1c4a73;
-}
-.prism-conservative .prism-side-label {
-  color: #7a3b22;
-}
-.prism-foreign .prism-side-label {
-  color: #2e5520;
+  margin-bottom: 8px;
 }
 
-/* 매체 태그 */
+/* '해외' 표시 - 진한 녹색 배지 (해외 박스에만 표시) */
+.prism-perspective-marker {
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  background: #5a8a45;
+  padding: 3px 9px;
+  border-radius: 6px;
+}
+
+/* 매체 이름 태그 - 박스의 실질적인 라벨 역할 */
 .prism-outlet-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
 }
 .prism-outlet-tag {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 6px;
 }
 .prism-progressive .prism-outlet-tag {
