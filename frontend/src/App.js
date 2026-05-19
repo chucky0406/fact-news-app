@@ -173,14 +173,6 @@ function App() {
   // About PRISM 페이지 - 컨셉 정리 (왜 → 어떻게 → 약속)
   const renderAboutPage = () => (
     <div className="prism-about">
-      <div className="prism-about-hero">
-        <h1 className="prism-about-logo">PRISM</h1>
-        <p className="prism-about-tagline">News beyond bias: for you and for your kids.</p>
-        <p className="prism-about-subtagline">
-          편향 너머의 뉴스 — 당신과 아이들을 위해
-        </p>
-      </div>
-
       <section className="prism-about-section">
         <h2 className="prism-about-section-title">왜 PRISM인가</h2>
         <p className="prism-about-lead">
@@ -252,6 +244,9 @@ function App() {
       </section>
 
       <div className="prism-about-footer">News beyond bias: for you and for your kids.</div>
+      <div className="prism-about-credit">
+        curated by <span className="foreb-mark">FOREB</span>
+      </div>
     </div>
   );
 
@@ -547,7 +542,7 @@ function App() {
             className={`dropdown-about ${category === 'about' ? 'active' : ''}`}
             onClick={() => handleCategoryChange('about')}
           >
-            About PRISM
+            PRISM 소개
           </button>
         </div>
       )}

@@ -249,35 +249,13 @@
   padding-bottom: 40px;
 }
 
-/* 히어로 */
-.prism-about-hero {
-  text-align: center;
-  padding: 44px 22px 36px;
-  background: #ffffff;
-  border-bottom: 1px solid #ededef;
-}
-.prism-about-logo {
-  font-size: 34px;
-  font-weight: 800;
-  letter-spacing: 3px;
-  color: #1c1c1e;
-  margin: 0 0 12px;
-}
-.prism-about-tagline {
-  font-size: 16px;
-  font-weight: 600;
-  color: #2f6db5;
-  margin: 0 0 6px;
-}
-.prism-about-subtagline {
-  font-size: 13.5px;
-  color: #8a8a8f;
-  margin: 0;
-}
-
 /* 섹션 */
 .prism-about-section {
   padding: 28px 20px 4px;
+}
+/* 히어로를 없앤 뒤 첫 섹션이 화면 위에 너무 붙지 않게 */
+.prism-about-section:first-child {
+  padding-top: 36px;
 }
 .prism-about-section-title {
   font-size: 16px;
@@ -356,11 +334,33 @@
 /* 닫는 문구 */
 .prism-about-footer {
   text-align: center;
-  padding: 34px 20px 8px;
+  padding: 34px 20px 4px;
   font-size: 15px;
   font-weight: 600;
-  color: #b0b0b5;
+  color: #000000;
   letter-spacing: 0.3px;
+}
+
+/* 제작 크레딧 - curated by FOREB */
+.prism-about-credit {
+  text-align: center;
+  padding: 6px 20px 8px;
+  font-size: 11.5px;
+  letter-spacing: 0.4px;
+  color: #9a9aa0;
+}
+/* FOREB 워드마크 - Cronos Pro Semibold
+   ※ Cronos Pro 는 Adobe Fonts(상용) 글꼴입니다.
+      Adobe Fonts 웹 프로젝트의 use.typekit.net 링크를
+      public/index.html 의 <head> 안에 넣어야 실제로 적용됩니다.
+      넣기 전에는 대체 글꼴(Optima/Segoe UI 등)로 표시됩니다. */
+.foreb-mark {
+  font-family: "cronos-pro", "Cronos Pro", "Optima", "Segoe UI", sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  font-size: 13px;
+  letter-spacing: 1.6px;
+  color: #1c1c1e;
 }
 
 /* =========================================================
