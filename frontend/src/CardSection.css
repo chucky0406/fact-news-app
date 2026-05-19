@@ -107,13 +107,13 @@
   margin-bottom: 0;
 }
 
-/* ── 매체별 해석 (좌·우 병치) ── */
+/* ── 매체별 해석 (진보 / 보수 / 해외 병치) ── */
 .prism-perspective-label {
   margin-bottom: 9px;
 }
 .prism-perspective-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
   gap: 9px;
 }
 .prism-perspective {
@@ -126,13 +126,35 @@
 .prism-conservative {
   background: #fbefe9;
 }
+.prism-foreign {
+  background: #e9f3e4;
+}
+
+/* 칸 머리: 성향 라벨 + 매체 태그 */
+.prism-perspective-head {
+  margin-bottom: 7px;
+}
+.prism-side-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.prism-progressive .prism-side-label {
+  color: #1c4a73;
+}
+.prism-conservative .prism-side-label {
+  color: #7a3b22;
+}
+.prism-foreign .prism-side-label {
+  color: #2e5520;
+}
 
 /* 매체 태그 */
 .prism-outlet-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-bottom: 7px;
 }
 .prism-outlet-tag {
   font-size: 11px;
@@ -148,6 +170,10 @@
   background: #f1d7ca;
   color: #7a3b22;
 }
+.prism-foreign .prism-outlet-tag {
+  background: #d2e6c6;
+  color: #2e5520;
+}
 
 /* 해석 본문 */
 .prism-framing {
@@ -160,6 +186,9 @@
 }
 .prism-conservative .prism-framing {
   color: #7c3f25;
+}
+.prism-foreign .prism-framing {
+  color: #2e5520;
 }
 .prism-framing-fallback {
   color: #2a2a2d;

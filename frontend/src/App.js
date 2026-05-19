@@ -5,6 +5,13 @@ import './CardSection.css';
 // 백엔드 API 주소 (URL이 바뀌면 이 한 줄만 수정하면 됩니다)
 const API_BASE = "https://fact-news-app-production.up.railway.app";
 
+// 카드 매체별 해석 칸 정의 (진보 / 보수 / 해외)
+const PERSPECTIVE_DEFS = [
+  { key: 'progressive', label: '진보', cls: 'prism-progressive' },
+  { key: 'conservative', label: '보수', cls: 'prism-conservative' },
+  { key: 'foreign', label: '해외', cls: 'prism-foreign' }
+];
+
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [category, setCategory] = useState('general');
@@ -68,7 +75,7 @@ function App() {
   // 카테고리 변경 시
   useEffect(() => {
     setMenuOpen(false);
-    
+
     if (category === 'cards') {
       fetchCards();
     } else {
@@ -249,10 +256,15 @@ function App() {
         )}
 
         {!loading && allCards.map((card) => {
-          const prog = card.perspectives && card.perspectives.progressive;
-          const cons = card.perspectives && card.perspectives.conservative;
-          const hasProg = !!(prog && prog.framing);
-          const hasCons = !!(cons && cons.framing);
+          // 내용이 있는 해석 칸만 추림 (진보 / 보수 / 해외)
+          const activePerspectives = PERSPECTIVE_DEFS
+            .map((def) => ({
+              ...def,
+              data: card.perspectives && card.perspectives[def.key]
+            }))
+            .filter((p) => p.data && p.data.framing);
+
+          const hasFacts = card.facts && card.facts.length > 0;
 
           return (
             <section className="prism-card-screen" key={card.id}>
@@ -267,7 +279,7 @@ function App() {
                 <h2 className="prism-card-title">{card.title}</h2>
 
                 {/* 확인된 사실 */}
-                {card.facts && card.facts.length > 0 && (
+                {hasFacts && (
                   <div className="prism-fact-box">
                     <div className="prism-section-label">📌 확인된 사실</div>
                     <ul className="prism-fact-list">
@@ -278,54 +290,42 @@ function App() {
                   </div>
                 )}
 
-                {/* 매체별 해석 (좌·우 병치) */}
-                {(hasProg || hasCons) && (
+                {/* 매체별 해석 (진보 / 보수 / 해외) */}
+                {activePerspectives.length > 0 && (
                   <>
                     <div className="prism-section-label prism-perspective-label">
                       🔍 매체별 해석
                     </div>
                     <div className="prism-perspective-grid">
-                      {hasProg && (
-                        <div className="prism-perspective prism-progressive">
-                          {(prog.outlets || []).length > 0 && (
-                            <div className="prism-outlet-tags">
-                              {prog.outlets.map((outlet, idx) => (
-                                <span key={idx} className="prism-outlet-tag">
-                                  {outlet}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          <p className="prism-framing">{prog.framing}</p>
+                      {activePerspectives.map((p) => (
+                        <div className={`prism-perspective ${p.cls}`} key={p.key}>
+                          <div className="prism-perspective-head">
+                            <span className="prism-side-label">{p.label}</span>
+                            {(p.data.outlets || []).length > 0 && (
+                              <div className="prism-outlet-tags">
+                                {p.data.outlets.map((outlet, idx) => (
+                                  <span key={idx} className="prism-outlet-tag">
+                                    {outlet}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <p className="prism-framing">{p.data.framing}</p>
                         </div>
-                      )}
-                      {hasCons && (
-                        <div className="prism-perspective prism-conservative">
-                          {(cons.outlets || []).length > 0 && (
-                            <div className="prism-outlet-tags">
-                              {cons.outlets.map((outlet, idx) => (
-                                <span key={idx} className="prism-outlet-tag">
-                                  {outlet}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          <p className="prism-framing">{cons.framing}</p>
-                        </div>
-                      )}
+                      ))}
                     </div>
                   </>
                 )}
 
                 {/* 구버전 데이터 호환: facts/perspectives 없이 analysis만 있을 때 */}
-                {(!card.facts || card.facts.length === 0) &&
-                  !hasProg && !hasCons && card.analysis && (
-                    <div className="prism-fact-box">
-                      <p className="prism-framing prism-framing-fallback">
-                        {card.analysis}
-                      </p>
-                    </div>
-                  )}
+                {!hasFacts && activePerspectives.length === 0 && card.analysis && (
+                  <div className="prism-fact-box">
+                    <p className="prism-framing prism-framing-fallback">
+                      {card.analysis}
+                    </p>
+                  </div>
+                )}
 
                 {/* 원문 링크 */}
                 {card.sources && card.sources.length > 0 && (

@@ -32,13 +32,12 @@ const CLAUDE_MODEL = 'claude-sonnet-4-6';
 const DATA_DIR = path.join(__dirname, 'data');
 const CARDS_FILE = path.join(DATA_DIR, 'cards.json');
 
-// data 폴더 생성
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// ===== 분야별 구글 뉴스 검색어 =====
-// 빈 문자열('')이면 구글 뉴스 한국판 메인 헤드라인을 가져옴
+// ===== 분야별 검색어 =====
+// 한국 뉴스 검색어 (구글 뉴스 한국판). 빈 문자열이면 메인 헤드라인
 const categoryQueries = {
   general: '',
   politics: '정치',
@@ -49,6 +48,19 @@ const categoryQueries = {
   sports: '스포츠',
   culture: '문화 예술',
   popular: '속보'
+};
+
+// 외신 검색어 (구글 뉴스 영문판) - 한국 관련 외국 보도 수집용
+const foreignQueries = {
+  general: 'South Korea',
+  politics: 'South Korea politics',
+  economy: 'South Korea economy',
+  science: 'South Korea technology',
+  health: 'South Korea health',
+  international: 'South Korea',
+  sports: 'South Korea sports',
+  culture: 'South Korea culture',
+  popular: 'South Korea'
 };
 
 const categoryLabels = {
@@ -63,22 +75,32 @@ const categoryLabels = {
   popular: '인기'
 };
 
-// ===== 매체 정치 성향 분류 =====
-// AllSides 방식의 좌·우 병치를 위해 사용. 분류 기준은 자유롭게 수정 가능.
-// 중앙일보는 통상 중도~보수로 분류되나, 본 앱에서는 2단 비교를 위해 보수로 묶음.
+// ===== 한국 매체 정치 성향 분류 =====
+// AllSides 방식의 진보/보수 병치를 위해 사용. 분류는 자유롭게 수정 가능.
+// 중앙일보는 통상 중도~보수로 분류되나 본 앱에서는 보수로 묶음.
+// 연합뉴스·KBS·SBS·YTN·뉴스1·뉴시스·한국일보·서울신문 등 통신사·중립 방송사는
+// 성향 분류가 논쟁적이라 의도적으로 미분류(unknown)로 두었습니다.
+// 진보/보수로 분류하고 싶으면 아래 맵에 한 줄씩 추가하세요.
 const mediaBias = {
+  // 진보 성향
   '한겨레': 'progressive',
   '경향신문': 'progressive',
   '경향': 'progressive',
   '오마이뉴스': 'progressive',
   '프레시안': 'progressive',
   '미디어오늘': 'progressive',
+  'MBC': 'progressive',
+  // 보수 성향
   '조선일보': 'conservative',
   '조선비즈': 'conservative',
+  '조선': 'conservative',
   '동아일보': 'conservative',
+  '동아': 'conservative',
   '중앙일보': 'conservative',
+  '중앙': 'conservative',
   '문화일보': 'conservative',
-  '세계일보': 'conservative'
+  '세계일보': 'conservative',
+  '채널A': 'conservative'
 };
 
 function getSide(sourceName) {
@@ -95,13 +117,30 @@ function hasBothSides(group) {
   return sides.has('progressive') && sides.has('conservative');
 }
 
-// 언론사명 정규화 (영문/변형 표기를 한국어 표준명으로)
+// ===== 외국 매체 판별 =====
+const foreignOutletKeywords = [
+  'reuters', 'associated press', 'afp', 'agence france', 'bloomberg',
+  'bbc', 'cnn', 'new york times', 'the guardian', 'al jazeera',
+  'nikkei', 'nhk', 'kyodo', 'xinhua', 'cgtn', 'south china morning post',
+  'scmp', 'washington post', 'financial times', 'wall street journal',
+  'the economist', 'abc news', 'nbc news', 'cbs news', 'deutsche welle',
+  'france 24', 'japan times', 'channel news asia', 'the diplomat',
+  'politico', 'axios', 'sky news', 'the independent', 'newsweek', 'cnbc'
+];
+
+function isForeign(name) {
+  if (!name) return false;
+  const lower = name.toLowerCase();
+  return foreignOutletKeywords.some(k => lower.includes(k));
+}
+
+// 한국 언론사명 정규화 (영문/변형 표기를 한국어 표준명으로)
 function normalizeSource(name) {
   if (!name) return '뉴스';
   const cleaned = name.trim();
   const map = {
-    'chosun': '조선일보',
     'chosunbiz': '조선비즈',
+    'chosun': '조선일보',
     'joongang': '중앙일보',
     'korea joongang daily': '중앙일보',
     'hankyoreh': '한겨레',
@@ -121,45 +160,67 @@ function normalizeSource(name) {
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY || 'your_api_key_here';
 
-// ===== 구글 뉴스 RSS에서 기사 가져오기 =====
-// 구글 뉴스는 안정적이며, 기사 제목 끝에 " - 언론사명" 형태로 출처를 제공
+// 구글 뉴스 제목에서 "기사 제목 - 언론사명" 분리
+function splitTitleSource(rawTitle) {
+  const raw = (rawTitle || '').trim();
+  const idx = raw.lastIndexOf(' - ');
+  if (idx > 0) {
+    return { title: raw.slice(0, idx).trim(), source: raw.slice(idx + 3).trim() };
+  }
+  return { title: raw, source: '' };
+}
+
+// ===== 구글 뉴스 RSS (한국판) =====
 async function fetchGoogleNews(query) {
   const url = query
     ? `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=ko&gl=KR&ceid=KR:ko`
     : `https://news.google.com/rss?hl=ko&gl=KR&ceid=KR:ko`;
 
   const articles = [];
-
   try {
     const feed = await parser.parseURL(url);
-
     feed.items.slice(0, 25).forEach(item => {
-      const rawTitle = (item.title || '').trim();
-      let title = rawTitle;
-      let source = '뉴스';
-
-      // 구글 뉴스 제목 형식: "기사 제목 - 언론사명"
-      const idx = rawTitle.lastIndexOf(' - ');
-      if (idx > 0) {
-        title = rawTitle.slice(0, idx).trim();
-        source = rawTitle.slice(idx + 3).trim();
-      }
-
+      const { title, source } = splitTitleSource(item.title);
       articles.push({
         id: `gn_${item.link}`,
         title: title,
         description: (item.contentSnippet || item.content || '').slice(0, 300),
         link: item.link,
         pubDate: item.pubDate || item.isoDate,
-        source: normalizeSource(source),
+        source: normalizeSource(source || '뉴스'),
         type: 'google'
       });
     });
   } catch (error) {
     console.error(`구글 뉴스 RSS 오류 (${query || '헤드라인'}):`, error.message);
   }
-
   return articles;
+}
+
+// ===== 구글 뉴스 RSS (영문판) - 한국 관련 외신만 필터 =====
+async function fetchForeignNews(query) {
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+  const articles = [];
+  try {
+    const feed = await parser.parseURL(url);
+    feed.items.slice(0, 30).forEach(item => {
+      const { title, source } = splitTitleSource(item.title);
+      if (isForeign(source)) {
+        articles.push({
+          id: `fn_${item.link}`,
+          title: title,
+          description: (item.contentSnippet || '').slice(0, 200),
+          link: item.link,
+          pubDate: item.pubDate || item.isoDate,
+          source: source,
+          type: 'foreign'
+        });
+      }
+    });
+  } catch (error) {
+    console.error(`외신 RSS 오류 (${query}):`, error.message);
+  }
+  return articles.slice(0, 15);
 }
 
 // News API에서 뉴스 가져오기 (보조 소스)
@@ -207,14 +268,12 @@ async function fetchNewsAPIArticles(category) {
 function calculateSimilarity(str1, str2) {
   const words1 = str1.toLowerCase().split(' ');
   const words2 = str2.toLowerCase().split(' ');
-
   let matches = 0;
   words1.forEach(w1 => {
     if (words2.some(w2 => w2.includes(w1) || w1.includes(w2))) {
       matches++;
     }
   });
-
   return matches / Math.max(words1.length, words2.length);
 }
 
@@ -225,13 +284,11 @@ function groupSimilarArticles(articles) {
 
   articles.forEach((article, index) => {
     if (used.has(index)) return;
-
     const group = [article];
     used.add(index);
 
     articles.forEach((other, otherIndex) => {
       if (used.has(otherIndex)) return;
-
       const similarity = calculateSimilarity(article.title, other.title);
       if (similarity > 0.5) {
         group.push(other);
@@ -272,12 +329,16 @@ async function generateObjectiveSummaryWithClaude(articles) {
   }
 }
 
-// ===== 카드 전용: 구조화된 분석 (사실 / 좌·우 해석 분리) =====
-async function generateStructuredCardAnalysis(articles) {
+// ===== 카드 전용: 구조화된 분석 (사실 / 진보·보수·해외 해석 분리) =====
+async function generateStructuredCardAnalysis(articles, foreignArticles) {
   try {
-    const articlesText = articles
+    const koreanText = articles
       .map(a => `[${a.source}]\n제목: ${a.title}\n내용: ${a.description || ''}`)
       .join('\n\n---\n\n');
+
+    const foreignText = (foreignArticles && foreignArticles.length)
+      ? foreignArticles.map(a => `[${a.source}] ${a.title} :: ${a.description || ''}`).join('\n')
+      : '(관련 외신 기사 없음)';
 
     const message = await anthropic.messages.create({
       model: CLAUDE_MODEL,
@@ -286,25 +347,33 @@ async function generateStructuredCardAnalysis(articles) {
         {
           role: 'user',
           content:
-`다음은 같은 사건에 대한 여러 신문사의 기사입니다.
-매체 정치 성향 참고 - 진보 성향: 한겨레, 경향신문, 오마이뉴스 / 보수 성향: 조선일보, 동아일보, 중앙일보
+`아래는 같은 사건에 대한 한국 신문사 기사들입니다.
+매체 정치 성향 참고 - 진보: 한겨레, 경향신문, 오마이뉴스, 프레시안, MBC / 보수: 조선일보, 동아일보, 중앙일보, 문화일보
 
-${articlesText}
+[한국 기사]
+${koreanText}
 
-위 기사들을 분석해 아래 JSON 형식으로만 응답하세요. 코드블록(\`\`\`)이나 그 외 설명 없이 순수 JSON만 출력합니다.
+아래는 비슷한 시기의 외신(외국 언론) 기사 목록입니다. 위 한국 사건과 관련 있을 수도, 전혀 무관할 수도 있습니다.
+
+[외신 기사]
+${foreignText}
+
+위 내용을 분석해 아래 JSON 형식으로만 응답하세요. 코드블록(\`\`\`)이나 설명 없이 순수 JSON만 출력합니다.
 
 {
-  "facts": ["여러 매체가 공통으로 전한 검증 가능한 핵심 사실. 해석·평가·전망을 배제하고 '무슨 일이 있었는가'만. 항목당 한 문장으로 간결하게. 최대 3개."],
+  "facts": ["여러 매체가 공통으로 전한 검증 가능한 핵심 사실. 해석·평가·전망을 배제하고 '무슨 일이 있었는가'만. 항목당 한 문장, 최대 3개."],
   "perspectives": {
-    "progressive": "진보 성향 매체들이 이 사건에서 무엇을 강조하고 어떤 의미를 부여했는지 2문장 이내로 중립적으로 기술. 진보 성향 기사가 없으면 빈 문자열.",
-    "conservative": "보수 성향 매체들이 이 사건에서 무엇을 강조하고 어떤 의미를 부여했는지 2문장 이내로 중립적으로 기술. 보수 성향 기사가 없으면 빈 문자열."
-  }
+    "progressive": "진보 성향 매체가 이 사건에서 무엇을 강조했는지 2문장 이내로 중립 기술. 진보 기사가 없으면 빈 문자열.",
+    "conservative": "보수 성향 매체가 이 사건에서 무엇을 강조했는지 2문장 이내로 중립 기술. 보수 기사가 없으면 빈 문자열.",
+    "foreign": "외신이 '위 한국 사건과 명백히 동일한 사건'을 다룬 경우에만, 외신이 이 사건을 어떻게 다뤘는지 2문장 이내로 기술. 관련 외신이 없으면 빈 문자열."
+  },
+  "foreignOutlets": ["위 외신 기사 목록 중 이 사건을 실제로 다룬 매체명만 그대로 적기. 없으면 빈 배열."]
 }
 
 원칙:
 - 어느 쪽이 옳은지 판단하지 말 것. 차이 자체만 드러낼 것.
 - facts(사실)와 perspectives(해석)를 명확히 분리할 것.
-- facts에 형용사적 평가나 어조를 섞지 말 것.`
+- 외신 기사가 한국 사건과 무관하면 절대 foreign을 채우지 말 것. 목록에 없는 외신을 지어내지 말 것.`
         }
       ]
     });
@@ -319,12 +388,15 @@ ${articlesText}
     }
 
     const parsed = JSON.parse(text);
+    const p = parsed.perspectives || {};
     return {
       facts: Array.isArray(parsed.facts) ? parsed.facts.slice(0, 3) : [],
       perspectives: {
-        progressive: (parsed.perspectives && parsed.perspectives.progressive) || '',
-        conservative: (parsed.perspectives && parsed.perspectives.conservative) || ''
-      }
+        progressive: p.progressive || '',
+        conservative: p.conservative || '',
+        foreign: p.foreign || ''
+      },
+      foreignOutlets: Array.isArray(parsed.foreignOutlets) ? parsed.foreignOutlets : []
     };
   } catch (error) {
     console.error('Claude 구조화 분석 오류:', error.message);
@@ -335,7 +407,6 @@ ${articlesText}
 // 뉴스 데이터 통합 및 정렬
 function mergeAndSortArticles(googleArticles, apiArticles) {
   const merged = [...googleArticles, ...apiArticles];
-
   const unique = [];
   const seen = new Set();
 
@@ -356,14 +427,27 @@ function mergeAndSortArticles(googleArticles, apiArticles) {
 // 안전한 날짜 포맷
 function formatDate(value) {
   const d = new Date(value);
-  if (isNaN(d.getTime())) {
-    return new Date().toLocaleDateString('ko-KR', {
-      year: 'numeric', month: '2-digit', day: '2-digit'
-    });
-  }
-  return d.toLocaleDateString('ko-KR', {
+  const base = isNaN(d.getTime()) ? new Date() : d;
+  return base.toLocaleDateString('ko-KR', {
     year: 'numeric', month: '2-digit', day: '2-digit'
   });
+}
+
+// Claude가 지목한 외신 매체명으로 외신 풀에서 실제 기사 찾기
+function matchForeignArticles(foreignOutlets, foreignPool) {
+  const matched = [];
+  const seenLinks = new Set();
+  (foreignOutlets || []).forEach(name => {
+    const lname = String(name).toLowerCase();
+    foreignPool.forEach(article => {
+      const lsrc = (article.source || '').toLowerCase();
+      if ((lsrc.includes(lname) || lname.includes(lsrc)) && !seenLinks.has(article.link)) {
+        seenLinks.add(article.link);
+        matched.push(article);
+      }
+    });
+  });
+  return matched;
 }
 
 // 매일 5시마다 실행되는 크론 작업
@@ -377,17 +461,18 @@ async function generateDailyCards() {
     console.log(`📰 ${categoryLabels[category]} 분야 처리 중...`);
 
     try {
-      // 뉴스 수집 (구글 뉴스 + News API)
+      // 한국 뉴스 수집 (구글 뉴스 + News API)
       const googleNews = await fetchGoogleNews(categoryQueries[category]);
       const apiNews = await fetchNewsAPIArticles(category);
-
       const articles = mergeAndSortArticles(googleNews, apiNews);
+
+      // 외신 풀 수집 (분야당 1회)
+      const foreignPool = await fetchForeignNews(foreignQueries[category]);
 
       // 같은 기사 그룹화 + 좌·우 매체가 함께 있는 그룹 우선 정렬
       const groups = groupSimilarArticles(articles);
       groups.sort((a, b) => (hasBothSides(b) ? 1 : 0) - (hasBothSides(a) ? 1 : 0));
 
-      // 그룹별 Claude 구조화 분석
       const cards = [];
 
       for (let i = 0; i < Math.min(10, groups.length); i++) {
@@ -395,7 +480,7 @@ async function generateDailyCards() {
         let structured = null;
 
         if (process.env.ANTHROPIC_API_KEY) {
-          structured = await generateStructuredCardAnalysis(group);
+          structured = await generateStructuredCardAnalysis(group, foreignPool);
         }
 
         const progressiveOutlets = [
@@ -404,6 +489,9 @@ async function generateDailyCards() {
         const conservativeOutlets = [
           ...new Set(group.filter(a => getSide(a.source) === 'conservative').map(a => a.source))
         ];
+
+        const foreignOutlets = structured ? structured.foreignOutlets : [];
+        const matchedForeign = matchForeignArticles(foreignOutlets, foreignPool);
 
         cards.push({
           id: `${category}_${i}_${Date.now()}`,
@@ -420,14 +508,26 @@ async function generateDailyCards() {
             conservative: {
               outlets: conservativeOutlets,
               framing: structured ? structured.perspectives.conservative : ''
+            },
+            foreign: {
+              outlets: foreignOutlets,
+              framing: structured ? structured.perspectives.foreign : ''
             }
           },
-          sources: group.map(article => ({
-            name: article.source,
-            side: getSide(article.source),
-            content: article.description || article.title,
-            link: article.link
-          })),
+          sources: [
+            ...group.map(article => ({
+              name: article.source,
+              side: getSide(article.source),
+              content: article.description || article.title,
+              link: article.link
+            })),
+            ...matchedForeign.map(article => ({
+              name: article.source,
+              side: 'foreign',
+              content: article.description || article.title,
+              link: article.link
+            }))
+          ],
           createdAt: new Date().toISOString()
         });
 
@@ -444,7 +544,6 @@ async function generateDailyCards() {
     }
   }
 
-  // 결과 저장
   try {
     fs.writeFileSync(CARDS_FILE, JSON.stringify({
       generatedAt: new Date().toISOString(),
@@ -477,18 +576,11 @@ app.get('/api/cards', (req, res) => {
         cards: {}
       });
     }
-
     const data = JSON.parse(fs.readFileSync(CARDS_FILE, 'utf-8'));
-    res.json({
-      success: true,
-      ...data
-    });
+    res.json({ success: true, ...data });
   } catch (error) {
     console.error('카드 조회 오류:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -496,18 +588,11 @@ app.get('/api/cards', (req, res) => {
 app.get('/api/cards/:category', (req, res) => {
   try {
     const { category } = req.params;
-
     if (!fs.existsSync(CARDS_FILE)) {
-      return res.json({
-        success: true,
-        message: '아직 생성된 카드가 없습니다.',
-        cards: []
-      });
+      return res.json({ success: true, message: '아직 생성된 카드가 없습니다.', cards: [] });
     }
-
     const data = JSON.parse(fs.readFileSync(CARDS_FILE, 'utf-8'));
     const cards = data.cards[category] || [];
-
     res.json({
       success: true,
       category: category,
@@ -518,10 +603,7 @@ app.get('/api/cards/:category', (req, res) => {
     });
   } catch (error) {
     console.error('카드 조회 오류:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -543,7 +625,6 @@ app.get('/api/news', async (req, res) => {
   try {
     const googleNews = await fetchGoogleNews(categoryQueries[category]);
     const apiNews = await fetchNewsAPIArticles(category);
-
     const articles = mergeAndSortArticles(googleNews, apiNews);
     const groups = groupSimilarArticles(articles);
 
@@ -554,7 +635,6 @@ app.get('/api/news', async (req, res) => {
       if (process.env.ANTHROPIC_API_KEY) {
         analysis = await generateObjectiveSummaryWithClaude(group);
       }
-
       formattedArticles.push({
         id: `group_${group[0].id}`,
         title: group[0].title,
@@ -586,17 +666,10 @@ app.get('/api/news', async (req, res) => {
       });
     });
 
-    res.json({
-      success: true,
-      articles: formattedArticles,
-      total: formattedArticles.length
-    });
+    res.json({ success: true, articles: formattedArticles, total: formattedArticles.length });
   } catch (error) {
     console.error('API 오류:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
@@ -608,7 +681,7 @@ app.get('/api/health', (req, res) => {
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`\n🚀 PRISM 뉴스 서버 실행 중: http://localhost:${PORT}`);
-  console.log('📰 구글 뉴스 RSS + News API + Claude 분석');
+  console.log('📰 구글 뉴스(한국·외신) + News API + Claude 분석');
   console.log('⏰ 매일 오전 5시에 자동 카드 생성');
   console.log(`\n📌 테스트: http://localhost:${PORT}/api/generate-now (GET/POST)\n`);
 });
