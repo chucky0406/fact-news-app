@@ -437,7 +437,11 @@
   color: rgba(255, 255, 255, 0.95);
 }
 
-/* 홈에서는 카테고리 바를 검게 처리해 검은 배경과 이어지게 한다 */
+/* 홈에서는 전체 배경을 검게 처리 (상단바와 첫 화면 사이 흰 띠 제거) */
+.App.home,
+.main-content.home {
+  background: #000000;
+}
 .category-bar.home {
   background: #000000 !important;
 }
