@@ -1,59 +1,69 @@
 /* =========================================================
-   PRISM - 카드 섹션 (분야별 카드 피드 + 뉴스 목록)
+   PRISM - 카드 섹션
+   가로 스와이프로 카드 이동, 카드 한 장은 세로 스크롤로 읽음
    prism- 접두사로 기존 App.css 와 충돌하지 않음
    ========================================================= */
 
-/* 스크롤 컨테이너 */
-.prism-card-feed,
+/* 분야 페이지 바깥 컨테이너 (세로 스크롤: 카드 영역 + 뉴스 목록) */
 .prism-category-view {
   width: 100%;
-  overflow-y: scroll;
+  overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   background: #f2f3f5;
 }
-.prism-card-feed::-webkit-scrollbar,
 .prism-category-view::-webkit-scrollbar {
   display: none;
 }
 
-/* '오늘의 카드' : 카드만 있으므로 칼같이 스냅 */
-.prism-card-feed {
-  scroll-snap-type: y mandatory;
+/* 카드 페이저 : 좌우로 넘기는 가로 스와이프 */
+.prism-card-pager {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  background: #f2f3f5;
 }
-/* 분야 페이지 : 카드 아래 뉴스 목록이 이어지므로 부드럽게 스냅 */
-.prism-category-view {
-  scroll-snap-type: y proximity;
+.prism-card-pager::-webkit-scrollbar {
+  display: none;
+}
+/* 분야 페이지 안에서는 카드 영역이 화면 전체 높이를 차지 */
+.prism-category-view > .prism-card-pager {
+  height: 100%;
 }
 
-/* 카드 한 장이 차지하는 한 화면 */
-.prism-card-screen {
+/* 카드 한 장 = 한 페이지. 내용이 길면 이 안에서 세로 스크롤 */
+.prism-card-page {
+  flex: 0 0 100%;
+  width: 100%;
   height: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   padding: 14px;
-  box-sizing: border-box;
+  scrollbar-width: none;
+}
+.prism-card-page::-webkit-scrollbar {
+  display: none;
 }
 
 /* 카드 본체 */
 .prism-card {
   width: 100%;
   max-width: 480px;
-  max-height: 100%;
-  overflow-y: auto;
+  margin: 0 auto;
   box-sizing: border-box;
   background: #ffffff;
   border: 1px solid #e7e7e9;
   border-radius: 18px;
   padding: 22px 20px;
-  scrollbar-width: none;
-}
-.prism-card::-webkit-scrollbar {
-  display: none;
 }
 
 /* 상단 : 분야 태그 + 날짜 */
@@ -251,12 +261,15 @@
 
 /* 로딩 / 빈 상태 */
 .prism-card-loading {
+  flex: 1 0 100%;
+  width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
   padding: 24px;
+  box-sizing: border-box;
   font-size: 15px;
   line-height: 1.6;
   color: #8a8a8f;

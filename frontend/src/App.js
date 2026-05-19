@@ -19,7 +19,7 @@ function App() {
   const [cards, setCards] = useState({});
   const [loading, setLoading] = useState(false);
 
-  // 카드 스와이프 피드 높이 (고정 헤더 아래 남은 화면을 꽉 채움)
+  // 카드 영역 높이 (고정 헤더 아래 남은 화면을 꽉 채움)
   const cardFeedRef = useRef(null);
   const [feedHeight, setFeedHeight] = useState('calc(100vh - 110px)');
 
@@ -85,7 +85,7 @@ function App() {
     }
   }, [category]);
 
-  // 스와이프 피드 높이 측정 (고정 헤더 높이를 빼고 남은 화면을 채움)
+  // 카드 영역 높이 측정 (고정 헤더 높이를 빼고 남은 화면을 채움)
   useEffect(() => {
     if (category === 'about') return;
 
@@ -167,8 +167,8 @@ function App() {
     </div>
   );
 
-  // 카드 한 장 렌더링 (분야 페이지 / 오늘의 카드 공용)
-  const renderCardArticle = (card) => {
+  // 카드 한 장 렌더링 (한 페이지 = 한 카드, 세로 스크롤로 끝까지 읽음)
+  const renderCardPage = (card) => {
     const activePerspectives = PERSPECTIVE_DEFS
       .map((def) => ({
         ...def,
@@ -179,7 +179,7 @@ function App() {
     const hasFacts = card.facts && card.facts.length > 0;
 
     return (
-      <section className="prism-card-screen" key={card.id}>
+      <div className="prism-card-page" key={card.id}>
         <article className="prism-card">
           <div className="prism-card-top">
             <span className="prism-card-cat">
@@ -258,7 +258,7 @@ function App() {
             </div>
           )}
         </article>
-      </section>
+      </div>
     );
   };
 
@@ -320,7 +320,7 @@ function App() {
     );
   };
 
-  // 분야 페이지 - 그 분야의 카드 피드 + 그 아래 뉴스 목록
+  // 분야 페이지 - 가로 스와이프 카드 + 그 아래 뉴스 목록
   const renderCategoryPage = () => {
     const categoryCards = cards[category] || [];
 
@@ -336,8 +336,12 @@ function App() {
 
         {!loading && (
           <>
-            {/* 이 분야의 카드 스와이프 피드 */}
-            {categoryCards.map((card) => renderCardArticle(card))}
+            {/* 이 분야의 카드 - 옆으로 넘기는 가로 스와이프 */}
+            {categoryCards.length > 0 && (
+              <div className="prism-card-pager">
+                {categoryCards.map((card) => renderCardPage(card))}
+              </div>
+            )}
 
             {categoryCards.length === 0 && (
               <div className="prism-cards-empty-note">
@@ -359,7 +363,7 @@ function App() {
     );
   };
 
-  // 오늘의 카드 - 모든 분야 카드를 한 줄로
+  // 오늘의 카드 - 모든 분야 카드를 가로 스와이프로
   const renderCardsPage = () => {
     const categoryOrder = [
       'general', 'politics', 'economy', 'science', 'health',
@@ -371,24 +375,29 @@ function App() {
       (cards[cat] || []).forEach((card) => allCards.push(card));
     });
 
+    if (loading || allCards.length === 0) {
+      return (
+        <div
+          className="prism-card-pager"
+          ref={cardFeedRef}
+          style={{ height: feedHeight }}
+        >
+          <div className="prism-card-loading">
+            {loading
+              ? '카드를 불러오는 중입니다...'
+              : '아직 생성된 카드가 없습니다.'}
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div
-        className="prism-card-feed"
+        className="prism-card-pager"
         ref={cardFeedRef}
         style={{ height: feedHeight }}
       >
-        {loading && (
-          <div className="prism-card-loading">카드를 불러오는 중입니다...</div>
-        )}
-
-        {!loading && allCards.length === 0 && (
-          <div className="prism-card-loading">
-            아직 생성된 카드가 없습니다.<br />
-            매일 오전 5시에 자동 생성됩니다.
-          </div>
-        )}
-
-        {!loading && allCards.map((card) => renderCardArticle(card))}
+        {allCards.map((card) => renderCardPage(card))}
       </div>
     );
   };
