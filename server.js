@@ -278,8 +278,11 @@ function calculateSimilarity(str1, str2) {
 }
 
 // 같은 기사 그룹화
+// - 여러 매체가 다룬 같은 사건은 하나의 그룹으로 묶는다 (다관점 카드)
+// - 단독 보도 기사도 1개짜리 그룹으로 포함해 분야별 카드 수를 채운다
 function groupSimilarArticles(articles) {
-  const groups = [];
+  const multi = [];   // 2개 이상 매체가 다룬 사건
+  const single = [];  // 단독 기사
   const used = new Set();
 
   articles.forEach((article, index) => {
@@ -297,11 +300,14 @@ function groupSimilarArticles(articles) {
     });
 
     if (group.length >= 2) {
-      groups.push(group);
+      multi.push(group);
+    } else {
+      single.push(group);
     }
   });
 
-  return groups;
+  // 다관점 그룹을 앞에, 단독 기사를 뒤에 두어 카드 수를 채운다
+  return [...multi, ...single];
 }
 
 // Claude로 객관적 요약 및 관점 분석 (기존 /api/news 용 - 유지)
@@ -451,6 +457,9 @@ function matchForeignArticles(foreignOutlets, foreignPool) {
 }
 
 // 매일 5시마다 실행되는 크론 작업
+// 분야별로 생성할 카드 수 (각 섹션 최대 10개)
+const CARDS_PER_CATEGORY = 10;
+
 async function generateDailyCards() {
   console.log('\n✨ [' + new Date().toLocaleString('ko-KR') + '] 자동 카드 생성 시작...');
 
@@ -475,7 +484,7 @@ async function generateDailyCards() {
 
       const cards = [];
 
-      for (let i = 0; i < Math.min(10, groups.length); i++) {
+      for (let i = 0; i < Math.min(CARDS_PER_CATEGORY, groups.length); i++) {
         const group = groups[i];
         let structured = null;
 
