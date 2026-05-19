@@ -41,7 +41,8 @@ function App() {
     sports: '스포츠',
     culture: '문화',
     popular: '인기',
-    cards: '오늘의 카드'
+    cards: '오늘의 카드',
+    about: 'PRISM 소개'
   };
 
   // 카드 가져오기 (/api/cards 는 모든 분야 카드를 한 번에 반환)
@@ -96,57 +97,88 @@ function App() {
     setCategory(newCategory);
   };
 
-  // About PRISM 페이지
+  // About PRISM 페이지 - 컨셉 정리 (왜 → 어떻게 → 약속)
   const renderAboutPage = () => (
-    <div className="about-section">
-      <div className="about-header">
-        <h1 className="about-logo">PRISM</h1>
-        <p className="about-tagline">세상을 바라보는 객관적인 시각</p>
+    <div className="prism-about">
+      <div className="prism-about-hero">
+        <h1 className="prism-about-logo">PRISM</h1>
+        <p className="prism-about-tagline">News beyond bias: for you and for your kids.</p>
+        <p className="prism-about-subtagline">
+          편향 너머의 뉴스 — 당신과 아이들을 위해
+        </p>
       </div>
-      <div className="about-content">
-        <div className="about-card">
-          <h3 className="about-card-title">🔍 다중 관점</h3>
-          <p className="about-card-text">
-            같은 사건을 여러 신문사의 관점에서 분석합니다. 
-            객관적인 시각으로 뉴스의 전체 그림을 파악하세요.
-          </p>
+
+      <section className="prism-about-section">
+        <h2 className="prism-about-section-title">왜 PRISM인가</h2>
+        <p className="prism-about-lead">
+          언젠가부터 뉴스를 읽는 일이 피곤해졌습니다. 같은 사건을 두고 매체마다
+          다른 이야기를 하고, 어느 쪽을 믿어야 할지 판단하는 데 더 많은 시간이
+          듭니다.
+        </p>
+        <p className="prism-about-lead">
+          PRISM은 그 피로감에서 출발했습니다. 어느 쪽이 옳다고 말하지 않습니다.
+          같은 사건이 어떻게 다르게 전해지는지를 나란히 보여주고, 판단은 읽는
+          사람의 몫으로 남겨둡니다.
+        </p>
+      </section>
+
+      <section className="prism-about-section">
+        <h2 className="prism-about-section-title">PRISM은 이렇게 봅니다</h2>
+        <div className="prism-about-cards">
+          <div className="prism-about-card">
+            <div className="prism-about-card-icon">🔭</div>
+            <h3 className="prism-about-card-title">매체별로 나란히</h3>
+            <p className="prism-about-card-text">
+              하나의 사건을 여러 매체가 각각 어떻게 보도했는지 한자리에 모읍니다.
+              우리가 고르지 않고, 차이를 그대로 드러냅니다.
+            </p>
+          </div>
+          <div className="prism-about-card">
+            <div className="prism-about-card-icon">⚖️</div>
+            <h3 className="prism-about-card-title">사실과 해석을 나눠서</h3>
+            <p className="prism-about-card-text">
+              '무슨 일이 있었나'와 '그것을 어떻게 볼까'를 분리합니다. 사실만
+              빠르게 확인할 수도, 해석을 비교할 수도 있습니다.
+            </p>
+          </div>
+          <div className="prism-about-card">
+            <div className="prism-about-card-icon">🍃</div>
+            <h3 className="prism-about-card-title">차분하게</h3>
+            <p className="prism-about-card-text">
+              자극적인 제목도, 편드는 어조도 없습니다. 싸움이 아니라 정보를
+              전합니다.
+            </p>
+          </div>
+          <div className="prism-about-card">
+            <div className="prism-about-card-icon">🧭</div>
+            <h3 className="prism-about-card-title">정치만이 아니라</h3>
+            <p className="prism-about-card-text">
+              경제, 과학, 문화까지. 매일 다양한 분야의 카드가 새로 만들어집니다.
+              세상은 정치보다 넓습니다.
+            </p>
+          </div>
         </div>
-        <div className="about-card">
-          <h3 className="about-card-title">🤖 AI 분석</h3>
-          <p className="about-card-text">
-            Claude AI가 각 기사를 분석하여 객관적 요약과 
-            신문사별 관점을 제시합니다.
-          </p>
-        </div>
-        <div className="about-card">
-          <h3 className="about-card-title">📰 통합 뉴스</h3>
-          <p className="about-card-text">
-            조선, 중앙, 경향, 한겨레, 동아 등 주요 신문사의 
-            뉴스를 한곳에서 확인하세요.
-          </p>
-        </div>
-        <div className="about-card">
-          <h3 className="about-card-title">⚡ 실시간 업데이트</h3>
-          <p className="about-card-text">
-            매일 오전 5시에 자동으로 뉴스가 업데이트됩니다. 
-            항상 최신 정보를 제공합니다.
-          </p>
-        </div>
-        <div className="about-card">
-          <h3 className="about-card-title">📊 카테고리별 분류</h3>
-          <p className="about-card-text">
-            종합, 정치, 경제, 과학/기술, 의료/건강, 국제, 
-            스포츠, 문화 등 다양한 분야의 뉴스를 제공합니다.
-          </p>
-        </div>
-        <div className="about-card">
-          <h3 className="about-card-title">✨ 오늘의 카드</h3>
-          <p className="about-card-text">
-            매일 생성되는 특별한 카드에서 주요 사건들을 
-            카테고리별로 한눈에 확인할 수 있습니다.
-          </p>
-        </div>
-      </div>
+      </section>
+
+      <section className="prism-about-section">
+        <h2 className="prism-about-section-title">우리의 약속</h2>
+        <ul className="prism-about-promise">
+          <li className="prism-about-promise-item">
+            매체에 '보수'나 '진보' 같은 딱지를 붙이지 않습니다. 누가
+            보도했는지만 보여주고, 분류는 읽는 사람의 몫으로 둡니다.
+          </li>
+          <li className="prism-about-promise-item">
+            같은 사건을 여러 곳에서 다룰 때, 그 차이를 가리지 않고 그대로
+            보여줍니다.
+          </li>
+          <li className="prism-about-promise-item">
+            PRISM은 정답을 정해주지 않습니다. 더 넓게 볼 수 있는 자리를 만들
+            뿐입니다.
+          </li>
+        </ul>
+      </section>
+
+      <div className="prism-about-footer">News beyond bias: for you and for your kids.</div>
     </div>
   );
 
@@ -316,7 +348,7 @@ function App() {
           >
             <div className="prism-header">
               <h1 className="prism-title">PRISM</h1>
-              <p className="prism-subtitle">세상을 바라보는 객관적인 시각</p>
+              <p className="prism-subtitle">News beyond bias: for you and for your kids.</p>
             </div>
           </button>
         </div>
@@ -400,7 +432,7 @@ function App() {
           </button>
 
           <button
-            className="dropdown-about"
+            className={`dropdown-about ${category === 'about' ? 'active' : ''}`}
             onClick={() => handleCategoryChange('about')}
           >
             About PRISM
