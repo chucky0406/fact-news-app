@@ -352,7 +352,46 @@ function App() {
             </div>
           </button>
         </div>
-        <div className="navbar-center"></div>
+        <div className="navbar-center">
+          <div className="prism-spinner" aria-hidden="true">
+            <svg
+              className="prism-spinner-svg"
+              viewBox="0 0 48 48"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              {/* 세 면(facet) - 빛을 받아 면마다 다른 스펙트럼 톤 */}
+              <path d="M24 6 L8.4 33 L24 24 Z" fill="#8fd3ff" fillOpacity="0.30" />
+              <path d="M24 6 L39.6 33 L24 24 Z" fill="#caa6ff" fillOpacity="0.30" />
+              <path d="M8.4 33 L39.6 33 L24 24 Z" fill="#ffd9a0" fillOpacity="0.22" />
+              {/* 내부 모서리 - 면 분할 */}
+              <path
+                d="M24 6 L24 24 M8.4 33 L24 24 M39.6 33 L24 24"
+                stroke="#ffffff"
+                strokeOpacity="0.32"
+                strokeWidth="1"
+                strokeLinecap="round"
+              />
+              {/* 바깥 윤곽 */}
+              <path
+                d="M24 6 L39.6 33 L8.4 33 Z"
+                fill="none"
+                stroke="#ffffff"
+                strokeOpacity="0.92"
+                strokeWidth="1.7"
+                strokeLinejoin="round"
+              />
+              {/* 유리 광택 (모서리 글린트) */}
+              <path
+                d="M24 6 L16.6 18.8"
+                fill="none"
+                stroke="#ffffff"
+                strokeOpacity="0.95"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        </div>
         <div className="navbar-right">
           <button className="user-btn">👤</button>
         </div>

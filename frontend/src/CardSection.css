@@ -371,3 +371,36 @@
 .prism-header .prism-subtitle {
   margin-top: 8px !important;
 }
+
+/* =========================================================
+   네비게이션 바 가운데 - 회전하는 투명 프리즘 아이콘
+   - 8s 에 한 바퀴 (느리고 우아하게). 속도는 animation 의 8s 만 조절.
+   - 은은한 푸른 글로우. 면마다 다른 스펙트럼 톤으로 유리 질감.
+   ========================================================= */
+.navbar-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.prism-spinner {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 5px rgba(150, 200, 255, 0.35));
+  animation: prism-spin 8s linear infinite;
+}
+.prism-spinner-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+@keyframes prism-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+/* 모션 최소화 설정을 켠 사용자에게는 회전을 멈춤 */
+@media (prefers-reduced-motion: reduce) {
+  .prism-spinner {
+    animation: none;
+  }
+}
