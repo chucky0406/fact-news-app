@@ -239,6 +239,19 @@
 /* =========================================================
    About PRISM 페이지
    ========================================================= */
+/* About 페이지: main-content 의 margin-top 이 흰 body 를 드러내므로
+   margin 대신 padding 으로 바꾸고 배경을 About 회색으로 채운다 */
+.main-content.about {
+  margin-top: 0;
+  padding-top: 107px;
+  background: #f2f3f5;
+}
+@media (max-width: 480px) {
+  .main-content.about {
+    padding-top: 102px;
+  }
+}
+
 .prism-about {
   width: 100%;
   height: calc(100vh - 110px);
@@ -253,9 +266,9 @@
 .prism-about-section {
   padding: 28px 20px 4px;
 }
-/* 히어로를 없앤 뒤 첫 섹션이 화면 위에 너무 붙지 않게 */
+/* 첫 섹션 - 카테고리 바 바로 아래, 위쪽 여백 최소화 */
 .prism-about-section:first-child {
-  padding-top: 36px;
+  padding-top: 12px;
 }
 .prism-about-section-title {
   font-size: 16px;
@@ -334,10 +347,10 @@
 /* 닫는 문구 */
 .prism-about-footer {
   text-align: center;
-  padding: 34px 20px 4px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #000000;
+  padding: 22px 20px 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #6a6a70;
   letter-spacing: 0.3px;
 }
 

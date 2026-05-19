@@ -381,7 +381,7 @@ function App() {
   };
 
   return (
-    <div className={`App${category === 'home' ? ' home' : ''}`}>
+    <div className={`App ${category}`}>
       {/* 네비게이션 바 */}
       <nav className="navbar">
         <div className="navbar-left">
@@ -528,7 +528,7 @@ function App() {
       )}
 
       {/* 메인 콘텐츠 */}
-      <div className={`main-content${category === 'home' ? ' home' : ''}`}>
+      <div className={`main-content ${category}`}>
         {category === 'home' && renderHomePage()}
         {category === 'about' && renderAboutPage()}
         {category === 'cards' && renderCardsPage()}
