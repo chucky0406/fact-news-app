@@ -97,212 +97,51 @@ function App() {
     setCategory(newCategory);
   };
 
-  // 첫 페이지(홈) - 프리즘이 회전하며 흰 빛을 무지개로 분리
+  // 첫 페이지(홈) - 작은 회전 프리즘 + curated by FOREB
   const renderHomePage = () => (
     <div
       className="prism-home"
       ref={cardFeedRef}
       style={{ height: feedHeight }}
     >
-      <div className="prism-hero" aria-hidden="true">
-        <div className="prism-hero-glow"></div>
+      <div className="prism-home-mark" aria-hidden="true">
         <svg
-          className="prism-svg"
-          viewBox="0 0 400 400"
+          className="prism-spinner-svg"
+          viewBox="0 0 48 48"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <defs>
-            {/* 유리 본체 채움 */}
-            <linearGradient id="glassFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#e8f7ff" stopOpacity="0.44" />
-              <stop offset="55%" stopColor="#c2e7ff" stopOpacity="0.20" />
-              <stop offset="100%" stopColor="#a9dbf5" stopOpacity="0.12" />
-            </linearGradient>
-            {/* 무지개 색 (띠를 가로지르는 방향) */}
-            <linearGradient
-              id="rainbowGrad"
-              gradientUnits="userSpaceOnUse"
-              x1="250.9"
-              y1="174.7"
-              x2="231.7"
-              y2="195"
-            >
-              <stop offset="0%" stopColor="#ff3b30" />
-              <stop offset="17%" stopColor="#ff9500" />
-              <stop offset="34%" stopColor="#ffd60a" />
-              <stop offset="51%" stopColor="#34c759" />
-              <stop offset="68%" stopColor="#32d4e6" />
-              <stop offset="84%" stopColor="#3a7bff" />
-              <stop offset="100%" stopColor="#9b5cff" />
-            </linearGradient>
-            {/* 들어오는 빛 - 멀리서 옅게, 프리즘 쪽으로 밝게 */}
-            <linearGradient
-              id="beamFade"
-              gradientUnits="userSpaceOnUse"
-              x1="30"
-              y1="60"
-              x2="166.3"
-              y2="171.9"
-            >
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
-              <stop offset="30%" stopColor="#ffffff" stopOpacity="0.06" />
-              <stop offset="55%" stopColor="#ffffff" stopOpacity="0.5" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0.95" />
-            </linearGradient>
-            {/* 무지개가 바깥쪽으로 갈수록 사라지게 하는 마스크 */}
-            <linearGradient
-              id="rainbowFadeGrad"
-              gradientUnits="userSpaceOnUse"
-              x1="241.3"
-              y1="184.8"
-              x2="393.5"
-              y2="329.5"
-            >
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
-              <stop offset="52%" stopColor="#ffffff" stopOpacity="1" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </linearGradient>
-            <mask id="rainbowFade">
-              <rect
-                x="200"
-                y="150"
-                width="240"
-                height="220"
-                fill="url(#rainbowFadeGrad)"
-              />
-            </mask>
-            {/* 부드러운 흰 빛 점 */}
-            <radialGradient id="softWhite" cx="0.5" cy="0.5" r="0.5">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
-              <stop offset="45%" stopColor="#ffffff" stopOpacity="0.32" />
-              <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-            </radialGradient>
-            {/* 배경 아우라 */}
-            <radialGradient id="heroAura" cx="0.5" cy="0.5" r="0.5">
-              <stop offset="0%" stopColor="#9fc4ff" stopOpacity="0.20" />
-              <stop offset="60%" stopColor="#5560a0" stopOpacity="0.06" />
-              <stop offset="100%" stopColor="#000000" stopOpacity="0" />
-            </radialGradient>
-            {/* 빛 번짐 */}
-            <filter
-              id="lightGlow"
-              x="-60%"
-              y="-60%"
-              width="220%"
-              height="220%"
-            >
-              <feGaussianBlur stdDeviation="5.5" />
-            </filter>
-          </defs>
-
-          {/* 은은한 아우라 */}
-          <circle cx="200" cy="200" r="195" fill="url(#heroAura)" />
-
-          {/* 빛 - 번짐(글로우) 레이어 */}
-          <g filter="url(#lightGlow)">
-            <line
-              x1="30"
-              y1="60"
-              x2="166.3"
-              y2="171.9"
-              stroke="url(#beamFade)"
-              strokeWidth="8"
-              strokeLinecap="round"
-            />
-            <polygon
-              points="231.7,195 250.9,174.7 403.2,319.4 383.9,339.7"
-              fill="url(#rainbowGrad)"
-              fillOpacity="0.55"
-              mask="url(#rainbowFade)"
-            />
-          </g>
-
-          {/* 들어오는 흰 빛 */}
-          <line
-            x1="30"
-            y1="60"
-            x2="166.3"
-            y2="171.9"
-            stroke="url(#beamFade)"
-            strokeWidth="3.4"
-            strokeLinecap="round"
-          />
-          <line
-            x1="30"
-            y1="60"
-            x2="166.3"
-            y2="171.9"
-            stroke="url(#beamFade)"
-            strokeWidth="1.3"
-            strokeLinecap="round"
-          />
-
-          {/* 분리되어 나오는 무지개 빛 */}
-          <polygon
-            className="rainbow-band"
-            points="231.7,195 250.9,174.7 403.2,319.4 383.9,339.7"
-            fill="url(#rainbowGrad)"
-            fillOpacity="0.95"
-            mask="url(#rainbowFade)"
-          />
-
-          {/* 프리즘 내부를 지나는 빛 */}
-          <line
-            x1="166.3"
-            y1="171.9"
-            x2="241.3"
-            y2="184.8"
+          {/* 세 면(facet) - 빛을 받아 면마다 다른 스펙트럼 톤 */}
+          <path d="M24 6 L8.4 33 L24 24 Z" fill="#8fd3ff" fillOpacity="0.30" />
+          <path d="M24 6 L39.6 33 L24 24 Z" fill="#caa6ff" fillOpacity="0.30" />
+          <path d="M8.4 33 L39.6 33 L24 24 Z" fill="#ffd9a0" fillOpacity="0.22" />
+          {/* 내부 모서리 - 면 분할 */}
+          <path
+            d="M24 6 L24 24 M8.4 33 L24 24 M39.6 33 L24 24"
             stroke="#ffffff"
-            strokeOpacity="0.5"
-            strokeWidth="1.8"
+            strokeOpacity="0.32"
+            strokeWidth="1"
             strokeLinecap="round"
           />
-
-          {/* 유리 프리즘 본체 */}
-          <polygon
-            points="200,113.4 125,243.3 275,243.3"
-            fill="url(#glassFill)"
-          />
-          {/* 내부 광택 */}
-          <ellipse cx="199" cy="168" rx="30" ry="40" fill="url(#softWhite)" />
-          {/* 윤곽 - 부드러운 가장자리 */}
-          <polygon
-            points="200,113.4 125,243.3 275,243.3"
+          {/* 바깥 윤곽 */}
+          <path
+            d="M24 6 L39.6 33 L8.4 33 Z"
             fill="none"
             stroke="#ffffff"
-            strokeOpacity="0.18"
-            strokeWidth="5"
+            strokeOpacity="0.92"
+            strokeWidth="1.7"
             strokeLinejoin="round"
           />
-          {/* 윤곽 - 선명한 가장자리 */}
-          <polygon
-            points="200,113.4 125,243.3 275,243.3"
+          {/* 유리 광택 (모서리 글린트) */}
+          <path
+            d="M24 6 L16.6 18.8"
             fill="none"
             stroke="#ffffff"
-            strokeOpacity="0.88"
-            strokeWidth="2"
-            strokeLinejoin="round"
-          />
-          {/* 위쪽 모서리 글린트 */}
-          <line
-            x1="200"
-            y1="113.4"
-            x2="176"
-            y2="155"
-            stroke="#ffffff"
-            strokeOpacity="1"
-            strokeWidth="2.6"
+            strokeOpacity="0.95"
+            strokeWidth="1.7"
             strokeLinecap="round"
           />
-          {/* 빛이 닿는 지점의 반짝임 */}
-          <circle cx="166.3" cy="171.9" r="9" fill="url(#softWhite)" />
-          {/* 빛이 나오는 지점의 반짝임 */}
-          <circle cx="241.3" cy="184.8" r="7" fill="url(#softWhite)" />
         </svg>
       </div>
-      <p className="prism-home-tagline">
-        News beyond bias: for you and for your kids.
-      </p>
       <div className="prism-home-credit">
         curated by <span className="foreb-mark">FOREB</span>
       </div>
