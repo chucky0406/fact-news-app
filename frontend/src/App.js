@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
+// 백엔드 API 주소 (URL이 바뀌면 이 한 줄만 수정하면 됩니다)
+const API_BASE = "https://fact-news-app-production.up.railway.app";
+
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [category, setCategory] = useState('general');
@@ -26,7 +29,7 @@ function App() {
     setLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:3001/api/news?category=${selectedCategory}`
+        `${API_BASE}/api/news?category=${selectedCategory}`
       );
       const data = await response.json();
       if (data.success) {
@@ -44,7 +47,7 @@ function App() {
   const fetchCards = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3001/api/cards');
+      const response = await fetch(`${API_BASE}/api/cards`);
       const data = await response.json();
       if (data.success) {
         setCards(data.cards || {});
