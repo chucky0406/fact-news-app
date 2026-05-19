@@ -235,3 +235,139 @@
   line-height: 1.6;
   color: #8a8a8f;
 }
+
+/* =========================================================
+   About PRISM 페이지
+   ========================================================= */
+.prism-about {
+  width: 100%;
+  height: calc(100vh - 110px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+  background: #f2f3f5;
+  padding-bottom: 40px;
+}
+
+/* 히어로 */
+.prism-about-hero {
+  text-align: center;
+  padding: 44px 22px 36px;
+  background: #ffffff;
+  border-bottom: 1px solid #ededef;
+}
+.prism-about-logo {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  color: #1c1c1e;
+  margin: 0 0 12px;
+}
+.prism-about-tagline {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2f6db5;
+  margin: 0 0 6px;
+}
+.prism-about-subtagline {
+  font-size: 13.5px;
+  color: #8a8a8f;
+  margin: 0;
+}
+
+/* 섹션 */
+.prism-about-section {
+  padding: 28px 20px 4px;
+}
+.prism-about-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1c1c1e;
+  margin: 0 0 14px;
+}
+.prism-about-lead {
+  font-size: 14.5px;
+  line-height: 1.72;
+  color: #44444a;
+  margin: 0 0 12px;
+}
+.prism-about-lead:last-child {
+  margin-bottom: 0;
+}
+
+/* 방식 카드 */
+.prism-about-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.prism-about-card {
+  background: #ffffff;
+  border: 1px solid #e7e7e9;
+  border-radius: 14px;
+  padding: 16px 17px;
+}
+.prism-about-card-icon {
+  font-size: 22px;
+  line-height: 1;
+  margin-bottom: 8px;
+}
+.prism-about-card-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1c1c1e;
+  margin: 0 0 5px;
+}
+.prism-about-card-text {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: #5a5a60;
+  margin: 0;
+}
+
+/* 약속 */
+.prism-about-promise {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.prism-about-promise-item {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #e7e7e9;
+  border-radius: 14px;
+  padding: 14px 16px 14px 38px;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: #44444a;
+}
+.prism-about-promise-item::before {
+  content: '✓';
+  position: absolute;
+  left: 15px;
+  top: 13px;
+  color: #2f6db5;
+  font-weight: 700;
+}
+
+/* 닫는 문구 */
+.prism-about-footer {
+  text-align: center;
+  padding: 34px 20px 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #b0b0b5;
+  letter-spacing: 0.3px;
+}
+
+/* =========================================================
+   네비게이션 바 부제 간격 보정 (App.css 보완)
+   PRISM 로고와 태그라인 사이를 살짝 띄운다.
+   간격을 더/덜 주려면 margin-top 값만 조절.
+   ========================================================= */
+.prism-header .prism-subtitle {
+  margin-top: 5px;
+}
