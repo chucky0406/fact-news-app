@@ -438,12 +438,25 @@
 }
 
 /* 홈에서는 전체 배경을 검게 처리 (상단바와 첫 화면 사이 흰 띠 제거) */
-.App.home,
-.main-content.home {
+/* .main-content 의 margin-top 은 바깥으로 빠져나가(margin collapse)
+   흰 body 배경을 드러낸다. margin 대신 padding 으로 바꿔
+   그 공간까지 .main-content(검정)로 채운다. */
+.App.home {
   background: #000000;
+}
+.main-content.home {
+  margin-top: 0;
+  padding-top: 107px;
+  background: #000000;
+}
+@media (max-width: 480px) {
+  .main-content.home {
+    padding-top: 102px;
+  }
 }
 .category-bar.home {
   background: #000000 !important;
+  border-bottom-color: transparent;
 }
 
 /* 모션 최소화 설정을 켠 사용자에게는 회전을 멈춤 */

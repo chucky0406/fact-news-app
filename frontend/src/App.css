@@ -126,7 +126,7 @@ html, body {
   top: 55px;
   left: 0;
   right: 0;
-  z-index: 999;
+  z-index: 990;
   border-bottom: 1px solid #f0f0f0;
   background-attachment: fixed;
   transition: background 0.3s ease;
@@ -186,6 +186,7 @@ html, body {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
+/* 메뉴 열렸을 때 뒤 배경 어둡게 - 카테고리 바보다 위, 메뉴보다 아래 */
 .backdrop {
   position: fixed;
   top: 0;
@@ -193,9 +194,10 @@ html, body {
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 99;
+  z-index: 995;
 }
 
+/* 드롭다운 메뉴 - 불투명한 풀 높이 패널, 모든 것 위에 표시 */
 .dropdown-menu {
   position: fixed;
   top: 55px;
@@ -203,9 +205,9 @@ html, body {
   width: 300px;
   background: #ffffff;
   border-right: 1px solid #f0f0f0;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
-  z-index: 100;
-  max-height: calc(100vh - 55px);
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.25);
+  z-index: 1100;
+  height: calc(100vh - 55px);
   overflow-y: auto;
 }
 
@@ -862,6 +864,8 @@ html, body {
   .dropdown-menu {
     width: 100vw;
     max-width: 280px;
+    top: 50px;
+    height: calc(100vh - 50px);
   }
 
   .dropdown-search {
