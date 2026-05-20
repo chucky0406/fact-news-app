@@ -1171,6 +1171,72 @@ app.get('/api/news', async (req, res) => {
 });
 
 // 헬스체크
+// ===== 진단용 엔드포인트 =====
+// /api/diagnose/economy 등으로 호출하면 어느 단계에서 기사가 사라지는지 보여준다.
+// 카드가 0개일 때 원인 추적용.
+app.get('/api/diagnose/:category', async (req, res) => {
+  const category = req.params.category;
+  if (!categoryQueries.hasOwnProperty(category)) {
+    return res.status(400).json({ error: '알 수 없는 분야', category });
+  }
+  try {
+    const googleNews = await fetchGoogleNews(categoryQueries[category]);
+    const pressNews = await fetchKoreanPressNews(category);
+    const apiNews = await fetchNewsAPIArticles(category);
+    const articles = mergeAndSortArticles(googleNews, pressNews, apiNews);
+
+    const targetDay = kstDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    const today = kstDateStr(new Date());
+
+    // 날짜별로 기사 몇 건씩 있는지
+    const byKstDate = {};
+    articles.forEach(a => {
+      const k = kstDateStr(a.pubDate) || '(날짜없음)';
+      byKstDate[k] = (byKstDate[k] || 0) + 1;
+    });
+
+    // 매체별 기사 수
+    const bySource = {};
+    articles.forEach(a => {
+      bySource[a.source || '(없음)'] = (bySource[a.source || '(없음)'] || 0) + 1;
+    });
+
+    // 전날 기사 샘플 5개
+    const yesterdayArticles = articles.filter(
+      a => a.pubDate && kstDateStr(a.pubDate) === targetDay
+    );
+
+    res.json({
+      category,
+      now_kst: today,
+      target_day_kst: targetDay,
+      counts: {
+        googleNews: googleNews.length,
+        pressNews: pressNews.length,
+        apiNews: apiNews.length,
+        merged: articles.length,
+        yesterday: yesterdayArticles.length
+      },
+      articles_by_kst_date: byKstDate,
+      articles_by_source: bySource,
+      yesterday_samples: yesterdayArticles.slice(0, 5).map(a => ({
+        title: a.title,
+        source: a.source,
+        pubDate: a.pubDate,
+        kstDate: kstDateStr(a.pubDate)
+      })),
+      all_samples: articles.slice(0, 3).map(a => ({
+        title: a.title,
+        source: a.source,
+        pubDate: a.pubDate,
+        kstDate: kstDateStr(a.pubDate)
+      }))
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message, stack: e.stack });
+  }
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
