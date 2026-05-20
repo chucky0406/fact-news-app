@@ -15,17 +15,169 @@ const PERSPECTIVE_DEFS = [
 ];
 
 // 카드의 해석 풍부도 = 채워진 해석 칸(진보/보수/해외) 개수
+// 카드 "내용 풍부함" 점수 - 관점 수 > 보도 매체 수 > 사실 수 > 해설 유무 순
 const cardRichness = (card) => {
   const p = card.perspectives || {};
-  return ['progressive', 'conservative', 'foreign']
+  const perspectives = ['progressive', 'conservative', 'foreign']
     .filter((k) => p[k] && p[k].framing).length;
+  const sources = Array.isArray(card.sources) ? card.sources.length : 0;
+  const facts = Array.isArray(card.facts) ? card.facts.length : 0;
+  const t = card.prismThought || {};
+  const hasThought = (t.short || t.long) ? 1 : 0;
+  return perspectives * 1000 + sources * 20 + facts * 5 + hasThought;
 };
+
+// 프리즘의 생각 - 짧은(1분 30초)/긴(5분) 해설 + 음성으로 듣기
+// 음성은 브라우저 내장 TTS(Web Speech API)를 사용한다.
+function PrismThoughts({ thought }) {
+  const shortText = (thought && thought.short) || '';
+  const longText = (thought && thought.long) || '';
+  const [version, setVersion] = useState(shortText ? 'short' : 'long');
+  const [isPlaying, setIsPlaying] = useState(false);
+
+  // 화면을 벗어나면 읽던 음성을 멈춘다
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  if (!shortText && !longText) return null;
+
+  const text = version === 'short' ? shortText : longText;
+
+  const stopAudio = () => {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    setIsPlaying(false);
+  };
+
+  const playAudio = () => {
+    const synth = window.speechSynthesis;
+    if (!synth) {
+      alert('이 브라우저에서는 음성 듣기를 지원하지 않습니다.');
+      return;
+    }
+    synth.cancel();
+    // 긴 문장은 일부 기기(iOS 등)에서 끊길 수 있어 문장 단위로 나눠 재생
+    const chunks = text
+      .split(/(?<=[.!?])\s+|\n+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (chunks.length === 0) return;
+    chunks.forEach((chunk, idx) => {
+      const utter = new SpeechSynthesisUtterance(chunk);
+      utter.lang = 'ko-KR';
+      utter.rate = 1.0;
+      if (idx === chunks.length - 1) {
+        utter.onend = () => setIsPlaying(false);
+      }
+      utter.onerror = () => setIsPlaying(false);
+      synth.speak(utter);
+    });
+    setIsPlaying(true);
+  };
+
+  const toggleAudio = () => {
+    if (isPlaying) stopAudio();
+    else playAudio();
+  };
+
+  const chooseVersion = (v) => {
+    if (v === version) return;
+    stopAudio();
+    setVersion(v);
+  };
+
+  return (
+    <div className="prism-thought-box">
+      <div className="prism-section-label">🔮 프리즘의 생각</div>
+      <div className="prism-thought-controls">
+        <div className="prism-thought-tabs">
+          <button
+            className={`prism-thought-tab ${version === 'short' ? 'active' : ''}`}
+            onClick={() => chooseVersion('short')}
+            disabled={!shortText}
+          >
+            1분 30초
+          </button>
+          <button
+            className={`prism-thought-tab ${version === 'long' ? 'active' : ''}`}
+            onClick={() => chooseVersion('long')}
+            disabled={!longText}
+          >
+            5분
+          </button>
+        </div>
+        <button
+          className={`prism-thought-listen ${isPlaying ? 'playing' : ''}`}
+          onClick={toggleAudio}
+        >
+          {isPlaying ? '■ 정지' : '🔊 듣기'}
+        </button>
+      </div>
+      <p className="prism-thought-text">{text}</p>
+    </div>
+  );
+}
+
+// Claude AI 워드마크 옆에 붙는 작은 4점 스파클 마크
+// - inline SVG, currentColor 사용 → 부모 텍스트 색을 그대로 따른다
+//   (홈에선 흰색 톤, About에선 어두운 회색 톤으로 자동 적용)
+function ClaudeMark() {
+  return (
+    <svg
+      className="claude-mark"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M12 2 L13.7 10.3 L22 12 L13.7 13.7 L12 22 L10.3 13.7 L2 12 L10.3 10.3 Z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+// 카드 위치 점 표시 - 카드가 많으면 현재 위치 중심의 창(window)으로 보여준다
+function CardDots({ total, current }) {
+  const MAX = 9;
+  const cur = Math.min(Math.max(current, 0), Math.max(total - 1, 0));
+  let start = 0;
+  let count = total;
+  if (total > MAX) {
+    count = MAX;
+    start = Math.min(Math.max(cur - Math.floor(MAX / 2), 0), total - MAX);
+  }
+  const moreLeft = start > 0;
+  const moreRight = start + count < total;
+  const dots = [];
+  for (let i = start; i < start + count; i++) {
+    let cls = 'prism-dot';
+    if (i === cur) {
+      cls += ' active';
+    } else if (
+      (i === start && moreLeft) ||
+      (i === start + count - 1 && moreRight)
+    ) {
+      cls += ' edge';
+    } else if (
+      (i === start + 1 && moreLeft) ||
+      (i === start + count - 2 && moreRight)
+    ) {
+      cls += ' near-edge';
+    }
+    dots.push(<span key={i} className={cls} />);
+  }
+  return <div className="prism-card-dots">{dots}</div>;
+}
 
 function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [category, setCategory] = useState('home');
   const [cards, setCards] = useState({});
   const [loading, setLoading] = useState(false);
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
 
   // 카드 영역 높이 (고정 헤더 아래 남은 화면을 꽉 채움)
   const cardFeedRef = useRef(null);
@@ -41,7 +193,7 @@ function App() {
     sports: '스포츠',
     culture: '문화',
     popular: '인기',
-    cards: '오늘의 카드',
+    cards: '오늘의뉴스',
     about: 'PRISM 소개'
   };
 
@@ -95,9 +247,10 @@ function App() {
 
   const handleCategoryChange = (newCategory) => {
     setCategory(newCategory);
+    setCurrentCardIndex(0);
   };
 
-  // 첫 페이지(홈) - 작은 회전 프리즘 + curated by FOREB
+  // 첫 페이지(홈) - 작은 회전 프리즘 + curated by Claude AI 크레딧
   const renderHomePage = () => (
     <div
       className="prism-home"
@@ -143,7 +296,7 @@ function App() {
         </svg>
       </div>
       <div className="prism-home-credit">
-        curated by <span className="foreb-mark">FOREB</span>
+        curated by <ClaudeMark /> Claude AI
       </div>
     </div>
   );
@@ -204,6 +357,54 @@ function App() {
       </section>
 
       <section className="prism-about-section">
+        <h2 className="prism-about-section-title">카드는 이렇게 만들어집니다</h2>
+        <ol className="prism-about-steps">
+          <li className="prism-about-step">
+            <span className="prism-about-step-num">1</span>
+            <div className="prism-about-step-body">
+              <h3 className="prism-about-step-title">넓게 모읍니다</h3>
+              <p className="prism-about-step-text">
+                매일, 지난 2주 동안 여러 신문과 방송, 그리고 외신이 보도한
+                기사를 분야별로 모읍니다.
+              </p>
+            </div>
+          </li>
+          <li className="prism-about-step">
+            <span className="prism-about-step-num">2</span>
+            <div className="prism-about-step-body">
+              <h3 className="prism-about-step-title">같은 이야기끼리 묶습니다</h3>
+              <p className="prism-about-step-text">
+                날짜와 표현이 달라도 같은 사건을 다룬 기사들을 하나로
+                묶습니다. 흩어진 보도가 한 흐름이 됩니다.
+              </p>
+            </div>
+          </li>
+          <li className="prism-about-step">
+            <span className="prism-about-step-num">3</span>
+            <div className="prism-about-step-body">
+              <h3 className="prism-about-step-title">여러 곳이 다룬 이슈를 먼저</h3>
+              <p className="prism-about-step-text">
+                많은 매체가 동시에 다룬 사건일수록 그만큼 시각도 다양합니다.
+                PRISM은 그런 이슈를 먼저 골라 카드로 만듭니다.
+              </p>
+            </div>
+          </li>
+          <li className="prism-about-step">
+            <span className="prism-about-step-num">4</span>
+            <div className="prism-about-step-body">
+              <h3 className="prism-about-step-title">사실과 해석으로 정제합니다</h3>
+              <p className="prism-about-step-text">
+                정제의 결과로 한 장의 카드가 만들어집니다. 어느 매체도 이견을
+                달지 않는 사실, 보도가 갈리는 핵심 지점, 진영별로 다른 해석,
+                그리고 어느 편도 들지 않는 '프리즘의 생각'까지 — 같은 사건의
+                여러 얼굴이 한 자리에 놓입니다.
+              </p>
+            </div>
+          </li>
+        </ol>
+      </section>
+
+      <section className="prism-about-section">
         <h2 className="prism-about-section-title">우리의 약속</h2>
         <ul className="prism-about-promise">
           <li className="prism-about-promise-item">
@@ -223,7 +424,7 @@ function App() {
 
       <div className="prism-about-footer">News beyond bias: for you and for your kids.</div>
       <div className="prism-about-credit">
-        curated by <span className="foreb-mark">FOREB</span>
+        curated by <ClaudeMark /> Claude AI
       </div>
     </div>
   );
@@ -257,6 +458,25 @@ function App() {
 
           <h2 className="prism-card-title">{card.title}</h2>
 
+          {/* 대표 사진(있으면) - 제목 바로 아래에 작게 표시.
+              사진이 없으면 Claude 가 만든 추상 SVG 폴백을 보여준다.
+              둘 다 없으면 빈 자리 차지하지 않는다. */}
+          {card.image ? (
+            <div className="prism-card-cover">
+              <img
+                src={card.image}
+                alt=""
+                loading="lazy"
+                onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
+              />
+            </div>
+          ) : card.svg ? (
+            <div
+              className="prism-card-cover prism-card-cover-svg"
+              dangerouslySetInnerHTML={{ __html: card.svg }}
+            />
+          ) : null}
+
           {/* 확인된 사실 */}
           {hasFacts && (
             <div className="prism-fact-box">
@@ -266,6 +486,14 @@ function App() {
                   <li key={idx}>{fact}</li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* 보도가 갈리는 지점 - 진영별 해석 위에 한 문장으로 쟁점을 명시 */}
+          {card.coreIssue && activePerspectives.length > 0 && (
+            <div className="prism-issue-box">
+              <span className="prism-issue-label">⚖️ 보도가 갈리는 지점</span>
+              <p className="prism-issue-text">{card.coreIssue}</p>
             </div>
           )}
 
@@ -310,6 +538,9 @@ function App() {
             </div>
           )}
 
+          {/* 프리즘의 생각 - 짧은/긴 버전 + 음성 듣기 */}
+          <PrismThoughts thought={card.prismThought} />
+
           {/* 원문 링크 */}
           {card.sources && card.sources.length > 0 && (
             <div className="prism-card-sources">
@@ -335,21 +566,31 @@ function App() {
 
   // 카드 페이저 (가로 스와이프) - 분야 페이지 / 오늘의 카드 공통
   const renderCardPager = (cardList, emptyMessage) => {
+    const handlePagerScroll = (e) => {
+      const el = e.currentTarget;
+      if (!el.clientWidth) return;
+      setCurrentCardIndex(Math.round(el.scrollLeft / el.clientWidth));
+    };
     return (
-      <div
-        className="prism-card-pager"
-        ref={cardFeedRef}
-        style={{ height: feedHeight }}
-      >
-        {loading && (
-          <div className="prism-card-loading">불러오는 중입니다...</div>
+      <div className="prism-card-pager-wrap" style={{ height: feedHeight }}>
+        <div
+          className="prism-card-pager"
+          ref={cardFeedRef}
+          onScroll={handlePagerScroll}
+        >
+          {loading && (
+            <div className="prism-card-loading">불러오는 중입니다...</div>
+          )}
+          {!loading && cardList.length === 0 && (
+            <div className="prism-cards-empty-note">{emptyMessage}</div>
+          )}
+          {!loading &&
+            cardList.length > 0 &&
+            cardList.map((card) => renderCardPage(card))}
+        </div>
+        {!loading && cardList.length > 1 && (
+          <CardDots total={cardList.length} current={currentCardIndex} />
         )}
-        {!loading && cardList.length === 0 && (
-          <div className="prism-cards-empty-note">{emptyMessage}</div>
-        )}
-        {!loading &&
-          cardList.length > 0 &&
-          cardList.map((card) => renderCardPage(card))}
       </div>
     );
   };
@@ -363,7 +604,7 @@ function App() {
     return renderCardPager(categoryCards, '이 분야의 카드는 아직 없습니다.');
   };
 
-  // 오늘의 카드 - 모든 분야 카드를 가로 스와이프로 (해석 풍부한 순)
+  // 오늘의뉴스 - 모든 분야 카드를 내용이 풍부한 순으로 (가로 스와이프)
   const renderCardsPage = () => {
     const categoryOrder = [
       'general', 'politics', 'economy', 'science', 'health',
@@ -457,6 +698,12 @@ function App() {
       {menuOpen && (
         <div className="dropdown-menu">
           <button
+            className={`dropdown-link ${category === 'cards' ? 'active' : ''}`}
+            onClick={() => handleCategoryChange('cards')}
+          >
+            오늘의뉴스
+          </button>
+          <button
             className={`dropdown-link ${category === 'general' ? 'active' : ''}`}
             onClick={() => handleCategoryChange('general')}
           >
@@ -509,13 +756,6 @@ function App() {
             onClick={() => handleCategoryChange('popular')}
           >
             인기
-          </button>
-
-          <button
-            className={`dropdown-link ${category === 'cards' ? 'active' : ''}`}
-            onClick={() => handleCategoryChange('cards')}
-          >
-            오늘의 카드
           </button>
 
           <button

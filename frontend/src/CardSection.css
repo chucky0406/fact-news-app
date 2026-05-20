@@ -4,11 +4,18 @@
    prism- 접두사로 기존 App.css 와 충돌하지 않음
    ========================================================= */
 
+/* 카드 페이저 래퍼 : 위치 점(dots)을 띄우기 위한 기준 */
+.prism-card-pager-wrap {
+  position: relative;
+  width: 100%;
+}
+
 /* 카드 페이저 : 좌우로 넘기는 가로 스와이프 */
 .prism-card-pager {
   display: flex;
   flex-direction: row;
   width: 100%;
+  height: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   scroll-snap-type: x mandatory;
@@ -18,6 +25,37 @@
 }
 .prism-card-pager::-webkit-scrollbar {
   display: none;
+}
+
+/* 카드 위치 점 표시 - 페이저 하단 가운데에 떠 있음 */
+.prism-card-dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.prism-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.22);
+  transition: width 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+.prism-dot.near-edge {
+  transform: scale(0.72);
+}
+.prism-dot.edge {
+  transform: scale(0.5);
+}
+.prism-dot.active {
+  width: 18px;
+  border-radius: 3px;
+  background: #2a2440;
 }
 
 /* 카드 한 장 = 한 페이지. 내용이 길면 이 안에서 세로 스크롤 */
@@ -30,7 +68,7 @@
   overflow-x: hidden;
   scroll-snap-align: start;
   scroll-snap-stop: always;
-  padding: 14px;
+  padding: 14px 14px 38px;
   scrollbar-width: none;
 }
 .prism-card-page::-webkit-scrollbar {
@@ -87,6 +125,27 @@
 }
 
 /* ── 확인된 사실 (중립 회색 박스) ── */
+/* 대표 사진/SVG - 제목 바로 아래, 작게.
+   사진 없으면 SVG 폴백, 둘 다 없으면 렌더 안 함. */
+.prism-card-cover {
+  width: 100%;
+  margin: 4px 0 14px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #f4f1ec;
+}
+.prism-card-cover img {
+  display: block;
+  width: 100%;
+  max-height: 130px;
+  object-fit: cover;
+}
+.prism-card-cover-svg svg {
+  display: block;
+  width: 100%;
+  height: 80px;
+}
+
 .prism-fact-box {
   background: #f4f5f7;
   border-radius: 12px;
@@ -108,6 +167,32 @@
 }
 .prism-fact-list li:last-child {
   margin-bottom: 0;
+}
+
+/* ── 보도가 갈리는 지점 (핵심 쟁점) ──
+   사실 박스와 매체별 해석 사이에서 '여기서 갈린다'를 한 문장으로 못박는 역할.
+   절제된 인용 스타일 - PRISM 브랜드 톤. */
+.prism-issue-box {
+  margin: 10px 0 12px;
+  padding: 11px 14px 12px;
+  background: #f4f1ec;
+  border-left: 3px solid #2a2440;
+  border-radius: 6px;
+}
+.prism-issue-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #6a6a70;
+  margin-bottom: 5px;
+}
+.prism-issue-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #2a2440;
+  font-style: italic;
 }
 
 /* ── 매체별 해석 ──
@@ -199,6 +284,86 @@
 }
 .prism-framing-fallback {
   color: #2a2a2d;
+}
+
+/* ── 프리즘의 생각 (음성으로 들을 수 있는 짧은/긴 해설) ── */
+.prism-thought-box {
+  background: linear-gradient(135deg, #f3f1fb 0%, #eef4fc 100%);
+  border: 1px solid #e5e3f1;
+  border-radius: 14px;
+  padding: 15px 16px;
+  margin-bottom: 18px;
+}
+.prism-thought-box .prism-section-label {
+  color: #5b4ea8;
+  margin-bottom: 11px;
+}
+
+/* 컨트롤 줄 : 길이 탭 + 듣기 버튼 */
+.prism-thought-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+/* 1분 30초 / 5분 세그먼트 탭 */
+.prism-thought-tabs {
+  display: inline-flex;
+  background: #e7e5f2;
+  border-radius: 9px;
+  padding: 3px;
+  gap: 3px;
+}
+.prism-thought-tab {
+  border: none;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6a6580;
+  padding: 6px 11px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.prism-thought-tab.active {
+  background: #ffffff;
+  color: #3b3470;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+.prism-thought-tab:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* 음성으로 듣기 버튼 */
+.prism-thought-listen {
+  border: none;
+  background: #2a2440;
+  color: #ffffff;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.prism-thought-listen:hover {
+  background: #1f1a30;
+}
+.prism-thought-listen.playing {
+  background: #b54141;
+}
+
+/* 본문 */
+.prism-thought-text {
+  font-size: 14.5px;
+  line-height: 1.72;
+  color: #2a2a2d;
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 /* 원문 링크 */
@@ -344,6 +509,53 @@
   font-weight: 700;
 }
 
+/* 카드 제작 과정 - 번호 매긴 단계 */
+.prism-about-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.prism-about-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid #e7e7e9;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+.prism-about-step-num {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2a2440;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.prism-about-step-body {
+  flex: 1;
+}
+.prism-about-step-title {
+  margin: 1px 0 4px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #1a1a1f;
+}
+.prism-about-step-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: #44444a;
+}
+
 /* 닫는 문구 */
 .prism-about-footer {
   text-align: center;
@@ -354,7 +566,7 @@
   letter-spacing: 0.3px;
 }
 
-/* 제작 크레딧 - curated by FOREB */
+/* 제작 크레딧 - curated by Claude AI */
 .prism-about-credit {
   text-align: center;
   padding: 6px 20px 8px;
@@ -362,20 +574,11 @@
   letter-spacing: 0.4px;
   color: #9a9aa0;
 }
-/* FOREB 워드마크 - Cronos Pro Semibold
+/* (구) FOREB 워드마크 - 더 이상 사용 안 함
    ※ Cronos Pro 는 Adobe Fonts(상용) 글꼴입니다.
       Adobe Fonts 웹 프로젝트의 use.typekit.net 링크를
       public/index.html 의 <head> 안에 넣어야 실제로 적용됩니다.
       넣기 전에는 대체 글꼴(Optima/Segoe UI 등)로 표시됩니다. */
-.foreb-mark {
-  font-family: "cronos-pro", "Cronos Pro", "Optima", "Segoe UI", sans-serif;
-  font-weight: 600;
-  font-style: normal;
-  font-size: 13px;
-  letter-spacing: 1.6px;
-  color: #1c1c1e;
-}
-
 /* =========================================================
    네비게이션 바 부제 간격 보정 (App.css 보완)
    'PRISM' 과 'News beyond bias...' 태그라인 사이 간격을 띄운다.
@@ -412,7 +615,7 @@
   to { transform: rotate(360deg); }
 }
 /* =========================================================
-   첫 페이지(홈) - 검은 배경, 가운데 작은 프리즘 + curated by FOREB
+   첫 페이지(홈) - 검은 배경, 가운데 작은 프리즘 + curated by Claude AI
    - 화면 고정 (스크롤/터치 잠금).
    - 프리즘 크기: .prism-home-mark 의 width/height.
    - 회전 속도: animation 의 8s (상단바 프리즘과 동일).
@@ -439,15 +642,26 @@
   animation: prism-spin 8s linear infinite;
 }
 
-/* curated by FOREB - 중앙 */
+/* curated by Claude AI - 중앙 */
 .prism-home-credit {
   text-align: center;
   font-size: 13px;
   letter-spacing: 0.5px;
   color: rgba(255, 255, 255, 0.5);
 }
-.prism-home-credit .foreb-mark {
-  color: rgba(255, 255, 255, 0.95);
+
+/* "Claude AI" 워드마크 옆 작은 스파클 아이콘
+   - currentColor 로 부모 텍스트 색을 그대로 따른다 (홈: 흰톤, About: 어두운톤)
+   - 텍스트와 베이스라인이 어긋나지 않도록 vertical-align 미세 조정 */
+.claude-mark {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  vertical-align: -1px;
+  margin: 0 2px 0 0;
+}
+.prism-home-credit .claude-mark {
+  color: rgba(255, 255, 255, 0.95);  /* 흐릿한 텍스트보다 마크는 또렷하게 */
 }
 
 /* 홈에서는 전체 배경을 검게 처리 (상단바와 첫 화면 사이 흰 띠 제거) */
