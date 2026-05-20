@@ -603,7 +603,7 @@ async function clusterArticlesWithClaude(articles) {
 
     const message = await anthropic.messages.create({
       model: CLAUDE_MODEL,
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [
         {
           role: 'user',
@@ -834,6 +834,11 @@ ${foreignText}
 // 뉴스 데이터 통합 및 정렬
 // 최근 2주(14일)치를 모은다 - 클러스터링 재료이며, 카드 노출은 별도로 '전날' 기준으로 거른다
 // 여러 소스(구글 뉴스, News API, 신문사 직접 RSS)의 배열을 인자로 받는다.
+//
+// ⚠️ 단순 "최신순 slice" 가 아닌 이유:
+//   매체들이 새벽에도 오늘치 기사를 빠르게 올려 상한(120)이 전부 오늘로 채워지면,
+//   카드 만들 대상인 '어제 KST' 기사가 한 건도 안 들어가는 사고가 난다.
+//   → 어제·오늘 KST 기사는 무조건 전부 보존하고, 남는 자리만 옛 기사로 채운다.
 function mergeAndSortArticles(...articleLists) {
   const merged = [].concat(...articleLists);
   const unique = [];
@@ -856,11 +861,29 @@ function mergeAndSortArticles(...articleLists) {
     }
   });
 
-  return unique.sort((a, b) => {
+  // 최신순 정렬
+  unique.sort((a, b) => {
     const dateA = new Date(a.pubDate || 0);
     const dateB = new Date(b.pubDate || 0);
     return dateB - dateA;
-  }).slice(0, 120);
+  });
+
+  // 어제·오늘 KST 기사는 무조건 전부 보존 (카드 만들 핵심 재료)
+  // 그 외 옛 기사는 남는 자리에 최신순으로 채운다 (같은 주제의 2주 흐름 맥락용)
+  const todayKst = kstDateStr(new Date());
+  const yesterdayKst = kstDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000));
+
+  const recent = [];
+  const older = [];
+  unique.forEach(a => {
+    const k = kstDateStr(a.pubDate);
+    if (k === todayKst || k === yesterdayKst) recent.push(a);
+    else older.push(a);
+  });
+
+  const LIMIT = 300;
+  const remaining = Math.max(0, LIMIT - recent.length);
+  return [...recent, ...older.slice(0, remaining)];
 }
 
 // 안전한 날짜 포맷
