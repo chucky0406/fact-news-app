@@ -1,794 +1,87 @@
-/* =========================================================
-   PRISM - 카드 섹션
-   가로 스와이프로 카드 이동, 카드 한 장은 세로 스크롤로 읽음
-   prism- 접두사로 기존 App.css 와 충돌하지 않음
-   ========================================================= */
+// ===================================================================
+// RSS 피드 검증 스크립트
+// 사용법:  D:\fact-news-app 폴더에서  ->  node test-feeds.js
+// server.js 의 koreanPressFeeds 에 등록된 모든 RSS 주소가
+// 실제로 살아있는지(파싱되는지, 최근 기사가 있는지) 확인한다.
+// rss-parser 는 이미 설치돼 있으므로 추가 설치 불필요.
+// ===================================================================
 
-/* 카드 페이저 래퍼 : 위치 점(dots)을 띄우기 위한 기준 */
-.prism-card-pager-wrap {
-  position: relative;
-  width: 100%;
-}
+const Parser = require('rss-parser');
 
-/* 카드 페이저 : 좌우로 넘기는 가로 스와이프 */
-.prism-card-pager {
-  display: flex;
-  flex-direction: row;
-  width: 100%;
-  height: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  background: #f2f3f5;
-}
-.prism-card-pager::-webkit-scrollbar {
-  display: none;
-}
+const parser = new Parser({
+  timeout: 12000,
+  headers: {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+      '(KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+    'Accept': 'application/rss+xml, application/xml, text/xml, */*;q=0.8',
+    'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8'
+  }
+});
 
-/* 카드 위치 점 표시 - 페이저 하단 가운데에 떠 있음 */
-.prism-card-dots {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 12px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  pointer-events: none;
-}
-.prism-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.22);
-  transition: width 0.2s ease, transform 0.2s ease, background 0.2s ease;
-}
-.prism-dot.near-edge {
-  transform: scale(0.72);
-}
-.prism-dot.edge {
-  transform: scale(0.5);
-}
-.prism-dot.active {
-  width: 18px;
-  border-radius: 3px;
-  background: #2a2440;
-}
+// server.js 의 koreanPressFeeds 와 동일한 목록 (general 피드만 검증)
+const feeds = [
+  // 기존 등록 매체
+  ['조선일보',   'https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml'],
+  ['매일경제',   'https://www.mk.co.kr/rss/40300001/'],
+  ['한겨레',     'http://www.hani.co.kr/rss/'],
+  ['오마이뉴스', 'https://rss.ohmynews.com/rss/ohmynews.xml'],
+  ['프레시안',   'https://www.pressian.com/api/v3/site/rss/news'],
+  ['SBS',        'https://news.sbs.co.kr/news/headlineRssFeed.do?plink=RSSREADER'],
+  ['동아일보',   'https://rss.donga.com/total.xml'],
+  ['경향신문',   'https://www.khan.co.kr/rss/rssdata/total_news.xml'],
+  ['서울신문',   'https://www.seoul.co.kr/xml/rss/rss_top.xml'],
+  // === 신규 추가 매체 ===
+  ['한국경제',   'https://www.hankyung.com/feed/all-news'],
+  ['연합뉴스',   'https://www.yna.co.kr/rss/news.xml'],
+  ['머니투데이', 'https://rss.mt.co.kr/mt_news.xml'],
+  ['뉴시스',     'https://newsis.com/RSS/sokbo.xml'],
+  // === 외신 직접 RSS ===
+  ['NYT',        'https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml'],
+  ['CNN',        'http://rss.cnn.com/rss/edition.rss'],
 
-/* 카드 한 장 = 한 페이지. 내용이 길면 이 안에서 세로 스크롤 */
-.prism-card-page {
-  flex: 0 0 100%;
-  width: 100%;
-  height: 100%;
-  box-sizing: border-box;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
-  padding: 14px 14px 38px;
-  scrollbar-width: none;
-}
-.prism-card-page::-webkit-scrollbar {
-  display: none;
-}
+  // === 사설/오피니언 RSS 후보 (검증용 - 살아있는 것만 server.js 에 반영) ===
+  ['[사설]조선일보',   'https://www.chosun.com/arc/outboundfeeds/rss/category/opinion/?outputType=xml'],
+  ['[사설]동아일보',   'https://rss.donga.com/editorials.xml'],
+  ['[사설]매일경제',   'https://www.mk.co.kr/rss/30000023/'],
+  ['[사설]한국경제',   'https://www.hankyung.com/feed/opinion'],
+  ['[사설]한겨레',     'http://www.hani.co.kr/rss/opinion/'],
+  ['[사설]경향신문',   'https://www.khan.co.kr/rss/rssdata/opinion_news.xml'],
+  ['[사설]오마이뉴스', 'https://rss.ohmynews.com/rss/opinion.xml'],
+  ['[사설]프레시안',   'https://www.pressian.com/api/v3/site/rss/opinion'],
+  ['[사설]NYT',        'https://rss.nytimes.com/services/xml/rss/nyt/Opinion.xml']
+];
 
-/* 카드 본체 */
-.prism-card {
-  width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-  box-sizing: border-box;
-  background: #ffffff;
-  border: 1px solid #e7e7e9;
-  border-radius: 18px;
-  padding: 22px 20px;
-}
-
-/* 상단 : 분야 태그 + 날짜 */
-.prism-card-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-.prism-card-cat {
-  font-size: 12px;
-  font-weight: 600;
-  color: #2f6db5;
-  background: #e8f1fb;
-  padding: 4px 10px;
-  border-radius: 7px;
-}
-.prism-card-date {
-  font-size: 12px;
-  color: #9a9a9f;
-}
-
-/* 제목 */
-.prism-card-title {
-  font-size: 19px;
-  font-weight: 700;
-  line-height: 1.4;
-  color: #1c1c1e;
-  margin: 0 0 16px;
-}
-
-/* 섹션 라벨 */
-.prism-section-label {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #6a6a70;
-  margin-bottom: 8px;
-}
-
-/* ── 확인된 사실 (중립 회색 박스) ── */
-/* 대표 사진/SVG - 제목 바로 아래, 작게.
-   사진 없으면 SVG 폴백, 둘 다 없으면 렌더 안 함. */
-.prism-card-cover {
-  width: 100%;
-  margin: 4px 0 14px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #f4f1ec;
-}
-.prism-card-cover img {
-  display: block;
-  width: 100%;
-  max-height: 130px;
-  object-fit: cover;
-}
-.prism-card-cover-svg svg {
-  display: block;
-  width: 100%;
-  height: 80px;
-}
-
-.prism-fact-box {
-  background: #f4f5f7;
-  border-radius: 12px;
-  padding: 13px 15px;
-  margin-bottom: 18px;
-}
-.prism-fact-box .prism-section-label {
-  margin-bottom: 6px;
-}
-.prism-fact-list {
-  margin: 0;
-  padding-left: 17px;
-}
-.prism-fact-list li {
-  font-size: 14.5px;
-  line-height: 1.62;
-  color: #2a2a2d;
-  margin-bottom: 3px;
-}
-.prism-fact-list li:last-child {
-  margin-bottom: 0;
-}
-
-/* ── 보도가 갈리는 지점 (핵심 쟁점) ──
-   사실 박스와 매체별 해석 사이에서 '여기서 갈린다'를 한 문장으로 못박는 역할.
-   절제된 인용 스타일 - PRISM 브랜드 톤. */
-/* ──────────────────────────────────────────
-   오피니언(사설) 카드 전용 스타일
-   - 출처는 매체 + 진영 라벨이 또렷이 보이게
-   - 찬성·반대 박스는 같은 폭으로 세로 배치, 색만 약한 톤 차이
-   ────────────────────────────────────────── */
-.prism-card-opinion {
-  /* 일반 카드와 같은 padding/배경 유지 */
-}
-.prism-opinion-source {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 4px 0 10px;
-  flex-wrap: wrap;
-}
-.prism-opinion-side {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 11px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: #fff;
-}
-.prism-opinion-side-conservative { background: #a85a32; }   /* 머스타드-적갈 */
-.prism-opinion-side-progressive  { background: #2e5e8a; }   /* 차분한 청색 */
-.prism-opinion-side-foreign      { background: #5a6d52; }   /* 올리브-그레이 */
-.prism-opinion-side-unknown      { background: #888; }
-.prism-opinion-outlet {
-  font-weight: 600;
-  font-size: 14px;
-  color: #2a2440;
-}
-.prism-opinion-tag {
-  font-size: 11px;
-  color: #6a6a70;
-  padding: 1px 7px;
-  border: 1px solid #d9d4ca;
-  border-radius: 9px;
-}
-
-/* 사설의 핵심 주장 - 사실 박스와 비슷한 톤이지만 인용 느낌 */
-.prism-opinion-claim {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.65;
-  color: #2a2440;
-  font-style: italic;
-}
-
-/* 찬성·반대 입장 박스 */
-.prism-opinion-args {
-  margin: 10px 0 14px;
-}
-.prism-opinion-args .prism-section-label {
-  margin-bottom: 9px;
-}
-.prism-opinion-arg {
-  margin-bottom: 9px;
-  padding: 11px 13px 12px;
-  border-radius: 7px;
-}
-.prism-opinion-arg:last-child { margin-bottom: 0; }
-.prism-opinion-arg-head {
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  margin-bottom: 5px;
-}
-.prism-opinion-arg p {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: #2a2440;
-}
-.prism-opinion-pro {
-  background: #f1ede4;            /* 옅은 베이지 */
-  border-left: 3px solid #a85a32; /* 보수 톤이 아닌, '찬성' 톤 - 따뜻한 색 */
-}
-.prism-opinion-pro .prism-opinion-arg-head { color: #8a4520; }
-.prism-opinion-con {
-  background: #ecf0f4;            /* 옅은 청색 */
-  border-left: 3px solid #2e5e8a; /* '반대' 톤 - 차분한 청색 */
-}
-.prism-opinion-con .prism-opinion-arg-head { color: #1f4566; }
-
-/* 소개 페이지 텍스트 스타일 (오피니언 설명) */
-.prism-about-text {
-  font-size: 14.5px;
-  line-height: 1.85;
-  color: #2a2440;
-  margin: 0 0 14px;
-}
-.prism-about-text:last-child { margin-bottom: 0; }
-.prism-about-text strong {
-  font-weight: 600;
-  color: #1a1530;
-}
-
-.prism-issue-box {
-  margin: 10px 0 12px;
-  padding: 11px 14px 12px;
-  background: #f4f1ec;
-  border-left: 3px solid #2a2440;
-  border-radius: 6px;
-}
-.prism-issue-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: #6a6a70;
-  margin-bottom: 5px;
-}
-.prism-issue-text {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #2a2440;
-  font-style: italic;
-}
-
-/* ── 매체별 해석 ──
-   정치 라벨 없이, 박스 머리에는 보도 매체 이름만 표시.
-   박스 색(은은한 톤 차이)만 시각적 구분으로 둔다.
-   위에서 아래로 한 칸씩 세로 정렬. */
-.prism-perspective-label {
-  margin-bottom: 9px;
-}
-.prism-perspective-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.prism-perspective {
-  width: 100%;
-  box-sizing: border-box;
-  border-radius: 12px;
-  padding: 13px 14px;
-}
-.prism-progressive {
-  background: #eaf2fb;
-}
-.prism-conservative {
-  background: #fbefe9;
-}
-.prism-foreign {
-  background: #e9f3e4;
-}
-
-/* 칸 머리: 매체 이름 태그 (해외 박스는 '해외' 표시가 앞에 붙음) */
-.prism-perspective-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-
-/* '해외' 표시 - 진한 녹색 배지 (해외 박스에만 표시) */
-.prism-perspective-marker {
-  font-size: 11px;
-  font-weight: 700;
-  color: #ffffff;
-  background: #5a8a45;
-  padding: 3px 9px;
-  border-radius: 6px;
-}
-
-/* 매체 이름 태그 - 박스의 실질적인 라벨 역할 */
-.prism-outlet-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-.prism-outlet-tag {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 3px 9px;
-  border-radius: 6px;
-}
-.prism-progressive .prism-outlet-tag {
-  background: #cfe1f4;
-  color: #1c4a73;
-}
-.prism-conservative .prism-outlet-tag {
-  background: #f1d7ca;
-  color: #7a3b22;
-}
-.prism-foreign .prism-outlet-tag {
-  background: #d2e6c6;
-  color: #2e5520;
-}
-
-/* 해석 본문 */
-.prism-framing {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.62;
-}
-.prism-progressive .prism-framing {
-  color: #1f4d78;
-}
-.prism-conservative .prism-framing {
-  color: #7c3f25;
-}
-.prism-foreign .prism-framing {
-  color: #2e5520;
-}
-.prism-framing-fallback {
-  color: #2a2a2d;
-}
-
-/* ── 프리즘의 생각 (음성으로 들을 수 있는 짧은/긴 해설) ── */
-.prism-thought-box {
-  background: linear-gradient(135deg, #f3f1fb 0%, #eef4fc 100%);
-  border: 1px solid #e5e3f1;
-  border-radius: 14px;
-  padding: 15px 16px;
-  margin-bottom: 18px;
-}
-.prism-thought-box .prism-section-label {
-  color: #5b4ea8;
-  margin-bottom: 11px;
-}
-
-/* 컨트롤 줄 : 길이 탭 + 듣기 버튼 */
-.prism-thought-controls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-/* 1분 30초 / 5분 세그먼트 탭 */
-.prism-thought-tabs {
-  display: inline-flex;
-  background: #e7e5f2;
-  border-radius: 9px;
-  padding: 3px;
-  gap: 3px;
-}
-.prism-thought-tab {
-  border: none;
-  background: none;
-  font-size: 12px;
-  font-weight: 600;
-  color: #6a6580;
-  padding: 6px 11px;
-  border-radius: 7px;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  white-space: nowrap;
-}
-.prism-thought-tab.active {
-  background: #ffffff;
-  color: #3b3470;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
-}
-.prism-thought-tab:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-/* 음성으로 듣기 버튼 */
-.prism-thought-listen {
-  border: none;
-  background: #2a2440;
-  color: #ffffff;
-  font-size: 12.5px;
-  font-weight: 600;
-  padding: 8px 14px;
-  border-radius: 9px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s;
-}
-.prism-thought-listen:hover {
-  background: #1f1a30;
-}
-.prism-thought-listen.playing {
-  background: #b54141;
-}
-
-/* 본문 */
-.prism-thought-text {
-  font-size: 14.5px;
-  line-height: 1.72;
-  color: #2a2a2d;
-  margin: 0;
-  white-space: pre-wrap;
-}
-
-/* 원문 링크 */
-.prism-card-sources {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #ededef;
-}
-.prism-source-link {
-  font-size: 12px;
-  color: #2f6db5;
-  text-decoration: none;
-}
-.prism-source-link:hover {
-  text-decoration: underline;
-}
-
-/* 로딩 / 빈 상태 - 카드 영역을 꽉 채워 가운데 정렬 */
-.prism-card-loading,
-.prism-cards-empty-note {
-  flex: 1 0 100%;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 24px;
-  box-sizing: border-box;
-  font-size: 15px;
-  line-height: 1.6;
-  color: #8a8a8f;
-}
-
-/* =========================================================
-   About PRISM 페이지
-   ========================================================= */
-/* About 페이지: main-content 의 margin-top 이 흰 body 를 드러내므로
-   margin 대신 padding 으로 바꾸고 배경을 About 회색으로 채운다 */
-.main-content.about {
-  margin-top: 0;
-  padding-top: 107px;
-  background: #f2f3f5;
-}
-@media (max-width: 480px) {
-  .main-content.about {
-    padding-top: 102px;
+async function checkFeed(name, url) {
+  try {
+    const feed = await parser.parseURL(url);
+    const count = feed.items ? feed.items.length : 0;
+    if (count === 0) {
+      return `△  ${name.padEnd(8)} 연결은 됐지만 기사 0건  (${url})`;
+    }
+    const first = feed.items[0];
+    const date = first.pubDate || first.isoDate || '날짜없음';
+    const title = (first.title || '').slice(0, 30);
+    return `✅ ${name.padEnd(8)} 기사 ${String(count).padStart(3)}건  최신: ${date}\n` +
+           `   └ "${title}..."`;
+  } catch (err) {
+    return `❌ ${name.padEnd(8)} 실패: ${err.message}  (${url})`;
   }
 }
 
-.prism-about {
-  width: 100%;
-  height: calc(100vh - 110px);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  box-sizing: border-box;
-  background: #f2f3f5;
-  padding-bottom: 40px;
-}
-
-/* 섹션 */
-.prism-about-section {
-  padding: 28px 20px 4px;
-}
-/* 첫 섹션 - 카테고리 바 바로 아래, 위쪽 여백 최소화 */
-.prism-about-section:first-child {
-  padding-top: 12px;
-}
-.prism-about-section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #1c1c1e;
-  margin: 0 0 14px;
-}
-.prism-about-lead {
-  font-size: 14.5px;
-  line-height: 1.72;
-  color: #44444a;
-  margin: 0 0 12px;
-}
-.prism-about-lead:last-child {
-  margin-bottom: 0;
-}
-
-/* 방식 카드 */
-.prism-about-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.prism-about-card {
-  background: #ffffff;
-  border: 1px solid #e7e7e9;
-  border-radius: 14px;
-  padding: 16px 17px;
-}
-.prism-about-card-icon {
-  font-size: 22px;
-  line-height: 1;
-  margin-bottom: 8px;
-}
-.prism-about-card-title {
-  font-size: 14.5px;
-  font-weight: 700;
-  color: #1c1c1e;
-  margin: 0 0 5px;
-}
-.prism-about-card-text {
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: #5a5a60;
-  margin: 0;
-}
-
-/* 약속 */
-.prism-about-promise {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.prism-about-promise-item {
-  position: relative;
-  background: #ffffff;
-  border: 1px solid #e7e7e9;
-  border-radius: 14px;
-  padding: 14px 16px 14px 38px;
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: #44444a;
-}
-.prism-about-promise-item::before {
-  content: '✓';
-  position: absolute;
-  left: 15px;
-  top: 13px;
-  color: #2f6db5;
-  font-weight: 700;
-}
-
-/* 카드 제작 과정 - 번호 매긴 단계 */
-.prism-about-steps {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.prism-about-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  background: #ffffff;
-  border: 1px solid #e7e7e9;
-  border-radius: 14px;
-  padding: 14px 16px;
-}
-.prism-about-step-num {
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #2a2440;
-  color: #ffffff;
-  font-size: 13px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.prism-about-step-body {
-  flex: 1;
-}
-.prism-about-step-title {
-  margin: 1px 0 4px;
-  font-size: 14.5px;
-  font-weight: 700;
-  color: #1a1a1f;
-}
-.prism-about-step-text {
-  margin: 0;
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: #44444a;
-}
-
-/* 닫는 문구 */
-.prism-about-footer {
-  text-align: center;
-  padding: 22px 20px 4px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #6a6a70;
-  letter-spacing: 0.3px;
-}
-
-/* 제작 크레딧 - curated by Claude AI */
-.prism-about-credit {
-  text-align: center;
-  padding: 6px 20px 8px;
-  font-size: 11.5px;
-  letter-spacing: 0.4px;
-  color: #9a9aa0;
-}
-/* (구) FOREB 워드마크 - 더 이상 사용 안 함
-   ※ Cronos Pro 는 Adobe Fonts(상용) 글꼴입니다.
-      Adobe Fonts 웹 프로젝트의 use.typekit.net 링크를
-      public/index.html 의 <head> 안에 넣어야 실제로 적용됩니다.
-      넣기 전에는 대체 글꼴(Optima/Segoe UI 등)로 표시됩니다. */
-/* =========================================================
-   네비게이션 바 부제 간격 보정 (App.css 보완)
-   'PRISM' 과 'News beyond bias...' 태그라인 사이 간격을 띄운다.
-   간격을 더/덜 주려면 margin-top 숫자만 조절하면 된다.
-   ========================================================= */
-.prism-header .prism-subtitle {
-  margin-top: 8px !important;
-}
-
-/* =========================================================
-   네비게이션 바 가운데 - 회전하는 투명 프리즘 아이콘
-   - 8s 에 한 바퀴 (느리고 우아하게). 속도는 animation 의 8s 만 조절.
-   - 은은한 푸른 글로우. 면마다 다른 스펙트럼 톤으로 유리 질감.
-   ========================================================= */
-.navbar-center {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.prism-spinner {
-  width: 30px;
-  height: 30px;
-  flex-shrink: 0;
-  filter: drop-shadow(0 0 5px rgba(150, 200, 255, 0.35));
-  animation: prism-spin 8s linear infinite;
-}
-.prism-spinner-svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-@keyframes prism-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-/* =========================================================
-   첫 페이지(홈) - 검은 배경, 가운데 작은 프리즘 + curated by Claude AI
-   - 화면 고정 (스크롤/터치 잠금).
-   - 프리즘 크기: .prism-home-mark 의 width/height.
-   - 회전 속도: animation 의 8s (상단바 프리즘과 동일).
-   ========================================================= */
-.prism-home {
-  width: 100%;
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  overscroll-behavior: none;
-  touch-action: none;
-  background: #000000;
-}
-
-/* 가운데 작은 프리즘 (상단바 프리즘과 동일, 회전) */
-.prism-home-mark {
-  width: 40px;
-  height: 40px;
-  margin-bottom: 14px;
-  filter: drop-shadow(0 0 6px rgba(150, 200, 255, 0.4));
-  animation: prism-spin 8s linear infinite;
-}
-
-/* curated by Claude AI - 중앙 */
-.prism-home-credit {
-  text-align: center;
-  font-size: 13px;
-  letter-spacing: 0.5px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-/* "Claude AI" 워드마크 옆 작은 스파클 아이콘
-   - currentColor 로 부모 텍스트 색을 그대로 따른다 (홈: 흰톤, About: 어두운톤)
-   - 텍스트와 베이스라인이 어긋나지 않도록 vertical-align 미세 조정 */
-.claude-mark {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  vertical-align: -1px;
-  margin: 0 2px 0 0;
-}
-.prism-home-credit .claude-mark {
-  color: rgba(255, 255, 255, 0.95);  /* 흐릿한 텍스트보다 마크는 또렷하게 */
-}
-
-/* 홈에서는 전체 배경을 검게 처리 (상단바와 첫 화면 사이 흰 띠 제거) */
-/* .main-content 의 margin-top 은 바깥으로 빠져나가(margin collapse)
-   흰 body 배경을 드러낸다. margin 대신 padding 으로 바꿔
-   그 공간까지 .main-content(검정)로 채운다. */
-.App.home {
-  background: #000000;
-}
-.main-content.home {
-  margin-top: 0;
-  padding-top: 107px;
-  background: #000000;
-}
-@media (max-width: 480px) {
-  .main-content.home {
-    padding-top: 102px;
+(async () => {
+  console.log('\n===== PRISM RSS 피드 검증 =====\n');
+  let ok = 0;
+  let fail = 0;
+  for (const [name, url] of feeds) {
+    const result = await checkFeed(name, url);
+    console.log(result);
+    if (result.startsWith('✅')) ok++;
+    else fail++;
   }
-}
-.category-bar.home {
-  background: #000000 !important;
-  border-bottom-color: transparent;
-}
-
-/* 모션 최소화 설정을 켠 사용자에게는 회전을 멈춤 */
-@media (prefers-reduced-motion: reduce) {
-  .prism-spinner,
-  .prism-home-mark {
-    animation: none;
+  console.log(`\n----- 결과: 정상 ${ok} / 문제 ${fail} (총 ${feeds.length}) -----\n`);
+  if (fail > 0) {
+    console.log('❌/△ 표시된 매체는 주소가 막혔거나 바뀐 것입니다.');
+    console.log('해당 매체 이름을 알려주시면 server.js 에서 주소를 고치거나 제거합니다.\n');
   }
-}
+})();
