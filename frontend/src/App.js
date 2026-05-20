@@ -3,7 +3,7 @@ import './App.css';
 import './CardSection.css';
 
 // 백엔드 API 주소 (URL이 바뀌면 이 한 줄만 수정하면 됩니다)
-const API_BASE = "https://fact-news-app-production.up.railway.app";
+const API_BASE = "https://fact-news-app.onrender.com";
 
 // 카드 매체별 해석 칸 (위에서부터 표시되는 순서)
 // 정치 라벨('보수/진보')을 붙이지 않는다. 박스 머리에는 그 사건을 보도한
