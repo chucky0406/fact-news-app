@@ -972,7 +972,33 @@ const CARDS_PER_CATEGORY = 5;
 async function generateDailyCards() {
   console.log('\n✨ [' + new Date().toLocaleString('ko-KR') + '] 자동 카드 생성 시작...');
 
-  const allCards = {};
+  // 기존 카드를 먼저 로드한다.
+  // - 분야별로 즉시 저장하므로, 어제 만든 카드는 새 카드로 덮어쓰기 전까지 유지된다.
+  // - 도중에 서비스가 죽어도 이미 저장된 분야는 살아남는다.
+  let allCards = {};
+  if (fs.existsSync(CARDS_FILE)) {
+    try {
+      const prev = JSON.parse(fs.readFileSync(CARDS_FILE, 'utf-8'));
+      if (prev && prev.cards) allCards = prev.cards;
+    } catch (e) {
+      allCards = {};
+    }
+  }
+
+  // 한 분야 끝날 때마다 cards.json 에 즉시 반영하는 헬퍼
+  const saveProgress = () => {
+    try {
+      fs.writeFileSync(CARDS_FILE, JSON.stringify({
+        generatedAt: new Date().toISOString(),
+        cards: allCards
+      }, null, 2));
+      const total = Object.values(allCards).flat().length;
+      console.log(`   💾 cards.json 저장 (누적 ${total}장)`);
+    } catch (error) {
+      console.error('   ⚠️ 저장 오류:', error.message);
+    }
+  };
+
   const categories = Object.keys(categoryLabels);
 
   for (const category of categories) {
@@ -1100,24 +1126,19 @@ async function generateDailyCards() {
 
       allCards[category] = cards;
       console.log(`✅ ${categoryLabels[category]}: ${cards.length}개 카드 생성`);
+      saveProgress(); // 분야 하나 끝날 때마다 즉시 디스크에 저장
 
     } catch (error) {
       console.error(`❌ ${categoryLabels[category]} 오류:`, error.message);
-      allCards[category] = [];
+      // 새 카드 생성 실패 시 - 기존 분야 카드를 지우지 말고 그대로 둔다.
+      // (allCards[category] = [] 로 덮어쓰면 이전 카드까지 잃음)
+      if (!allCards[category]) allCards[category] = [];
+      saveProgress();
     }
   }
 
-  try {
-    fs.writeFileSync(CARDS_FILE, JSON.stringify({
-      generatedAt: new Date().toISOString(),
-      cards: allCards
-    }, null, 2));
-
-    console.log(`\n🎉 자동 카드 생성 완료! (${CARDS_FILE})`);
-    console.log(`총 ${Object.values(allCards).flat().length}개 카드 생성됨`);
-  } catch (error) {
-    console.error('파일 저장 오류:', error);
-  }
+  console.log(`\n🎉 자동 카드 생성 완료! (${CARDS_FILE})`);
+  console.log(`총 ${Object.values(allCards).flat().length}개 카드`);
 }
 
 // 크론 작업 등록: 매일 새벽 03:00(한국 시간)에 실행
