@@ -592,6 +592,51 @@ function groupSimilarArticles(articles) {
 // Claude 로 기사를 같은 사건·주제끼리 묶는다
 // - 날짜·표현이 달라도 본질적으로 같은 사안이면 한 그룹으로 (같은 주제 다른 날짜 문제 해결)
 // - 실패하거나 API 키가 없으면 단어 겹침 방식(groupSimilarArticles)으로 대체
+// Claude 응답에서 안전하게 JSON 을 뽑아낸다.
+// Claude 가 가끔 문자열 안에 raw 줄바꿈/탭/제어문자를 그대로 넣어 JSON.parse 가 실패한다.
+// "Bad control character in string literal in JSON" 류 오류 방지.
+// 두 단계로 시도: (1) 그대로 파싱  (2) 문자열 내부의 제어문자만 이스케이프 후 재시도
+function safeJsonParse(text) {
+  // 1차 시도 - 그대로
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    // 2차 시도 - 문자열 ("..." 안)의 raw 제어문자 이스케이프
+    let inString = false;
+    let escaped = false;
+    let cleaned = '';
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      const code = c.charCodeAt(0);
+      if (escaped) {
+        cleaned += c;
+        escaped = false;
+        continue;
+      }
+      if (c === '\\') {
+        cleaned += c;
+        escaped = true;
+        continue;
+      }
+      if (c === '"') {
+        cleaned += c;
+        inString = !inString;
+        continue;
+      }
+      // 문자열 내부의 raw 제어문자 처리
+      if (inString && code < 0x20) {
+        if (c === '\n') cleaned += '\\n';
+        else if (c === '\r') cleaned += '\\r';
+        else if (c === '\t') cleaned += '\\t';
+        // 그 외 제어문자(\x00 ~ \x1F)는 그냥 제거
+        continue;
+      }
+      cleaned += c;
+    }
+    return JSON.parse(cleaned);
+  }
+}
+
 async function clusterArticlesWithClaude(articles) {
   if (!process.env.ANTHROPIC_API_KEY || articles.length === 0) {
     return groupSimilarArticles(articles);
@@ -629,7 +674,7 @@ ${list}
     const start = text.indexOf('[');
     const end = text.lastIndexOf(']');
     if (start !== -1 && end !== -1) text = text.slice(start, end + 1);
-    const indexGroups = JSON.parse(text);
+    const indexGroups = safeJsonParse(text);
 
     const used = new Set();
     const groups = [];
@@ -808,7 +853,7 @@ ${foreignText}
       text = text.slice(start, end + 1);
     }
 
-    const parsed = JSON.parse(text);
+    const parsed = safeJsonParse(text);
     const p = parsed.perspectives || {};
     return {
       headline: (typeof parsed.headline === 'string') ? parsed.headline.trim() : '',
