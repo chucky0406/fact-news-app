@@ -47,8 +47,7 @@ const feeds = [
   ['[사설]한국경제',   'https://www.hankyung.com/feed/opinion'],
   ['[사설]한겨레',     'http://www.hani.co.kr/rss/opinion/'],
   ['[사설]경향신문',   'https://www.khan.co.kr/rss/rssdata/opinion_news.xml'],
-  ['[사설]오마이뉴스', 'https://rss.ohmynews.com/rss/opinion.xml'],
-  ['[사설]프레시안',   'https://www.pressian.com/api/v3/site/rss/opinion'],
+  // 오마이뉴스·프레시안 사설 RSS 는 404 로 응답해 제거 (2026-05-20 검증)
   ['[사설]NYT',        'https://rss.nytimes.com/services/xml/rss/nyt/Opinion.xml']
 ];
 

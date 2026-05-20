@@ -319,15 +319,12 @@ const editorialFeeds = [
     url: 'https://www.mk.co.kr/rss/30000023/' },
   { source: '한국경제', side: 'conservative',
     url: 'https://www.hankyung.com/feed/opinion' },
-  // 진보 (4곳 후보)
+  // 진보 (2곳)
+  // 오마이뉴스·프레시안 사설 RSS 는 404 로 응답해 제거 (2026-05-20 검증)
   { source: '한겨레', side: 'progressive',
     url: 'http://www.hani.co.kr/rss/opinion/' },
   { source: '경향신문', side: 'progressive',
     url: 'https://www.khan.co.kr/rss/rssdata/opinion_news.xml' },
-  { source: '오마이뉴스', side: 'progressive',
-    url: 'https://rss.ohmynews.com/rss/opinion.xml' },
-  { source: '프레시안', side: 'progressive',
-    url: 'https://www.pressian.com/api/v3/site/rss/opinion' },
   // 외신 (1곳)
   { source: 'The New York Times', side: 'foreign',
     url: 'https://rss.nytimes.com/services/xml/rss/nyt/Opinion.xml' }
