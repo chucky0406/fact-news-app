@@ -87,7 +87,6 @@ const categoryQueries = {
   international: '국제',
   sports: '스포츠',
   culture: '문화 예술',
-  popular: '속보'
 };
 
 // 외신 검색어 (구글 뉴스 영문판) - 한국 관련 외국 보도 수집용
@@ -100,7 +99,6 @@ const foreignQueries = {
   international: 'South Korea',
   sports: 'South Korea sports',
   culture: 'South Korea culture',
-  popular: 'South Korea'
 };
 
 // ===== 한국 신문사 직접 RSS 피드 (보조 소스) =====
@@ -158,7 +156,6 @@ const koreanPressFeeds = [
       health: 'https://rss.donga.com/health.xml',
       sports: 'https://rss.donga.com/sports.xml',
       culture: 'https://rss.donga.com/culture.xml',
-      popular: 'https://rss.donga.com/total.xml'
     }
   },
   {
@@ -172,7 +169,6 @@ const koreanPressFeeds = [
       health: 'https://www.khan.co.kr/rss/rssdata/society.xml',
       sports: 'https://www.khan.co.kr/rss/rssdata/sports.xml',
       culture: 'https://www.khan.co.kr/rss/rssdata/culture.xml',
-      popular: 'https://www.khan.co.kr/rss/rssdata/total_news.xml'
     }
   },
   {
@@ -186,7 +182,6 @@ const koreanPressFeeds = [
       health: 'https://www.seoul.co.kr/xml/rss/rss_life.xml',
       sports: 'https://www.seoul.co.kr/xml/rss/rss_sports.xml',
       culture: 'https://www.seoul.co.kr/xml/rss/rss_culture.xml',
-      popular: 'https://www.seoul.co.kr/xml/rss/rss_top.xml'
     }
   },
   // ===== 사용자 추가 요청 매체 (검증 완료) =====
@@ -224,8 +219,7 @@ const categoryLabels = {
   health: '의료/건강',
   international: '국제',
   sports: '스포츠',
-  culture: '문화',
-  popular: '인기'
+  culture: '문화'
 };
 
 // ===== 한국 매체 정치 성향 분류 =====
@@ -513,7 +507,6 @@ async function fetchNewsAPIArticles(category) {
       international: '국제 뉴스',
       sports: '스포츠',
       culture: '문화 예술',
-      popular: '인기',
       general: '한국 뉴스'
     };
 

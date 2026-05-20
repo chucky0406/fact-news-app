@@ -192,7 +192,6 @@ function App() {
     international: '국제',
     sports: '스포츠',
     culture: '문화',
-    popular: '인기',
     cards: '오늘의뉴스',
     about: 'PRISM 소개'
   };
@@ -608,7 +607,7 @@ function App() {
   const renderCardsPage = () => {
     const categoryOrder = [
       'general', 'politics', 'economy', 'science', 'health',
-      'international', 'sports', 'culture', 'popular'
+      'international', 'sports', 'culture'
     ];
 
     const allCards = [];
@@ -750,12 +749,6 @@ function App() {
             onClick={() => handleCategoryChange('culture')}
           >
             문화
-          </button>
-          <button
-            className={`dropdown-link ${category === 'popular' ? 'active' : ''}`}
-            onClick={() => handleCategoryChange('popular')}
-          >
-            인기
           </button>
 
           <button
