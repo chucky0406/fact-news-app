@@ -16,7 +16,19 @@ const PERSPECTIVE_DEFS = [
 
 // 카드의 해석 풍부도 = 채워진 해석 칸(진보/보수/해외) 개수
 // 카드 "내용 풍부함" 점수 - 관점 수 > 보도 매체 수 > 사실 수 > 해설 유무 순
+// 오피니언 카드는 데이터 구조가 달라 별도 점수 체계.
 const cardRichness = (card) => {
+  // 오피니언 카드 - 양쪽 논거 모두 있는 카드 우선
+  // 점수대는 일반 카드보다 낮게 두어 '오늘의뉴스'에서 일반 카드 뒤에 모이게 한다.
+  if (card.category === 'opinion') {
+    const pro = card.proArgument ? 1 : 0;
+    const con = card.conArgument ? 1 : 0;
+    const claim = card.editorialClaim ? 1 : 0;
+    const t = card.prismThought || {};
+    const hasThought = (t.short || t.long) ? 1 : 0;
+    return (pro + con) * 100 + claim * 10 + hasThought * 5;
+  }
+  // 일반 카드
   const p = card.perspectives || {};
   const perspectives = ['progressive', 'conservative', 'foreign']
     .filter((k) => p[k] && p[k].framing).length;
@@ -192,6 +204,7 @@ function App() {
     international: '국제',
     sports: '스포츠',
     culture: '문화',
+    opinion: '오피니언',
     cards: '오늘의뉴스',
     about: 'PRISM 소개'
   };
@@ -403,6 +416,26 @@ function App() {
         </ol>
       </section>
 
+      {/* 오피니언 분야 별도 설명 */}
+      <section className="prism-about-section">
+        <h2 className="prism-about-section-title">오피니언은 조금 다릅니다</h2>
+        <p className="prism-about-text">
+          뉴스가 '무슨 일이 있었는가'를 다룬다면, 사설은 '그래서 어떻게 봐야
+          하는가'를 다룹니다. 사설은 매체의 색이 가장 또렷이 드러나는 글입니다.
+        </p>
+        <p className="prism-about-text">
+          PRISM의 오피니언 분야는 매일 어제 발행된 사설 다섯 편을 골라 보여
+          줍니다. <strong>보수 매체에서 한 편, 진보 매체에서 한 편, 외신에서 한
+          편, 다시 보수, 다시 진보</strong> — 진영이 번갈아 나오도록 배열합니다.
+        </p>
+        <p className="prism-about-text">
+          각 사설마다 그 주장에 <strong>찬성하는 입장의 가장 강한 논거</strong>와
+          <strong>반대하는 입장의 가장 강한 논거</strong>를 나란히 정리합니다.
+          사설을 읽는 동시에 그 반대편 시각도 자연히 만나도록 — 한쪽 글만 읽고
+          그 입장에 갇히지 않도록. 어느 쪽도 정답으로 두지 않습니다.
+        </p>
+      </section>
+
       <section className="prism-about-section">
         <h2 className="prism-about-section-title">우리의 약속</h2>
         <ul className="prism-about-promise">
@@ -429,7 +462,114 @@ function App() {
   );
 
   // 카드 한 장 렌더링 (한 페이지 = 한 카드, 세로 스크롤로 끝까지 읽음)
+  // 오피니언 카드 전용 렌더링
+  // - 단일 매체 사설 한 편
+  // - 핵심 주장 + 찬성·반대 입장 + 프리즘의 정리
+  const renderOpinionCardPage = (card) => {
+    const sideLabel = card.sourceSide === 'conservative'
+      ? '보수'
+      : card.sourceSide === 'progressive'
+      ? '진보'
+      : card.sourceSide === 'foreign'
+      ? '외신'
+      : '';
+    const sideClass = card.sourceSide || 'unknown';
+
+    return (
+      <div className="prism-card-page" key={card.id}>
+        <article className="prism-card prism-card-opinion">
+          <div className="prism-card-top">
+            <span className="prism-card-cat">
+              {card.categoryLabel || '오피니언'}
+            </span>
+            <span className="prism-card-date">{card.date}</span>
+          </div>
+
+          <h2 className="prism-card-title">{card.title}</h2>
+
+          {/* 사설 출처 - 매체명 + 진영 라벨 */}
+          <div className="prism-opinion-source">
+            <span className={`prism-opinion-side prism-opinion-side-${sideClass}`}>
+              {sideLabel}
+            </span>
+            <span className="prism-opinion-outlet">{card.source}</span>
+            <span className="prism-opinion-tag">사설</span>
+          </div>
+
+          {/* 대표 사진(있으면) / 없으면 SVG */}
+          {card.image ? (
+            <div className="prism-card-cover">
+              <img
+                src={card.image}
+                alt=""
+                loading="lazy"
+                onError={(e) => { e.currentTarget.parentElement.style.display = 'none'; }}
+              />
+            </div>
+          ) : card.svg ? (
+            <div
+              className="prism-card-cover prism-card-cover-svg"
+              dangerouslySetInnerHTML={{ __html: card.svg }}
+            />
+          ) : null}
+
+          {/* 사설의 핵심 주장 */}
+          {card.editorialClaim && (
+            <div className="prism-fact-box">
+              <div className="prism-section-label">📝 사설의 핵심 주장</div>
+              <p className="prism-opinion-claim">{card.editorialClaim}</p>
+            </div>
+          )}
+
+          {/* 찬성 vs 반대 - 두 입장 세로 배열 */}
+          {(card.proArgument || card.conArgument) && (
+            <div className="prism-opinion-args">
+              <div className="prism-section-label">⚖️ 찬성과 반대</div>
+              {card.proArgument && (
+                <div className="prism-opinion-arg prism-opinion-pro">
+                  <div className="prism-opinion-arg-head">찬성하는 입장</div>
+                  <p>{card.proArgument}</p>
+                </div>
+              )}
+              {card.conArgument && (
+                <div className="prism-opinion-arg prism-opinion-con">
+                  <div className="prism-opinion-arg-head">반대하는 입장</div>
+                  <p>{card.conArgument}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 프리즘의 정리 (일반 카드와 같은 컴포넌트 재사용) */}
+          {card.prismThought && (card.prismThought.short || card.prismThought.long) && (
+            <PrismThoughts thought={card.prismThought} />
+          )}
+
+          {/* 원문 링크 */}
+          {card.sourceUrl && (
+            <div className="prism-card-sources">
+              <a
+                className="prism-source-link"
+                href={card.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {card.source} 사설 원문 ↗
+              </a>
+            </div>
+          )}
+        </article>
+      </div>
+    );
+  };
+
   const renderCardPage = (card) => {
+    // 오피니언(사설) 카드는 일반 뉴스 카드와 구조가 다르다.
+    // 단일 매체의 사설 → 핵심 주장 + 찬성·반대 입장 + 프리즘의 정리.
+    if (card.category === 'opinion') {
+      return renderOpinionCardPage(card);
+    }
+
     const activePerspectives = PERSPECTIVE_DEFS
       .map((def) => ({
         ...def,
@@ -607,7 +747,7 @@ function App() {
   const renderCardsPage = () => {
     const categoryOrder = [
       'general', 'politics', 'economy', 'science', 'health',
-      'international', 'sports', 'culture'
+      'international', 'sports', 'culture', 'opinion'
     ];
 
     const allCards = [];
@@ -749,6 +889,12 @@ function App() {
             onClick={() => handleCategoryChange('culture')}
           >
             문화
+          </button>
+          <button
+            className={`dropdown-link ${category === 'opinion' ? 'active' : ''}`}
+            onClick={() => handleCategoryChange('opinion')}
+          >
+            오피니언
           </button>
 
           <button

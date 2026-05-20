@@ -165,8 +165,8 @@ html, body {
   background: linear-gradient(90deg, #a8edea 0%, #fed6e3 50%, rgba(254, 214, 227, 0) 100%);
 }
 
-.category-bar.popular {
-  background: linear-gradient(90deg, #ff9a56 0%, #ff6a88 50%, rgba(255, 106, 136, 0) 100%);
+.category-bar.opinion {
+  background: linear-gradient(90deg, #a85a32 0%, #2e5e8a 50%, rgba(46, 94, 138, 0) 100%);
 }
 
 .category-bar.cards {

@@ -70,11 +70,105 @@ const CLAUDE_MODEL = 'claude-sonnet-4-6';
 
 // 데이터 저장 경로
 const DATA_DIR = path.join(__dirname, 'data');
-const CARDS_FILE = path.join(DATA_DIR, 'cards.json');
+// ===== 카드 저장소 (메모리 + GitHub Gist) =====
+// Render 무료 등급은 ephemeral storage - 로컬 파일에 의존하면 재배포 시 다 날아간다.
+// 카드는 메모리에만 보관하고, 영구 백업은 GitHub Gist 에 둔다.
+// 시작 시 Gist 에서 로드 → 메모리, 카드 생성/갱신 시 메모리 + Gist 동시 갱신.
+let cardsCache = { generatedAt: null, cards: {} };
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// ===== GitHub Gist 영구 백업 =====
+// 환경변수 GIST_ID, GITHUB_TOKEN 이 둘 다 설정되어야 작동.
+const GIST_ID = process.env.GIST_ID;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const GIST_FILENAME = 'cards.json';
+
+async function loadFromGist() {
+  if (!GITHUB_TOKEN || !GIST_ID) return null;
+  try {
+    const resp = await axios.get(`https://api.github.com/gists/${GIST_ID}`, {
+      headers: {
+        Authorization: `Bearer ${GITHUB_TOKEN}`,
+        Accept: 'application/vnd.github+json'
+      },
+      timeout: 12000
+    });
+    const file = resp.data.files && resp.data.files[GIST_FILENAME];
+    if (!file || !file.content) return null;
+    return JSON.parse(file.content);
+  } catch (e) {
+    console.error('☁️ Gist 로드 실패:', e.message);
+    return null;
+  }
 }
+
+async function saveToGist(data) {
+  if (!GITHUB_TOKEN || !GIST_ID) return false;
+  try {
+    await axios.patch(
+      `https://api.github.com/gists/${GIST_ID}`,
+      {
+        files: {
+          [GIST_FILENAME]: {
+            content: JSON.stringify(data, null, 2)
+          }
+        }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${GITHUB_TOKEN}`,
+          Accept: 'application/vnd.github+json'
+        },
+        timeout: 15000
+      }
+    );
+    lastGistSaveAt = new Date().toISOString();
+    lastGistSaveOk = true;
+    lastGistError = null;
+    return true;
+  } catch (e) {
+    lastGistSaveAt = new Date().toISOString();
+    lastGistSaveOk = false;
+    lastGistError = e.message;
+    console.error('☁️ Gist 저장 실패:', e.message);
+    return false;
+  }
+}
+
+// ===== Gist 백업 직렬화 큐 =====
+// fire-and-forget 으로 여러 요청을 동시에 보내면 GitHub 가 순서를 보장하지 않아
+// 옛 요청이 늦게 도착해서 최신 데이터를 덮어쓰는 race condition 발생 가능.
+// 큐로 한 번에 하나씩만 전송하고, 대기 중에 새 요청 오면 페이로드만 갱신해 합친다.
+// scheduleGistSave 는 promise 를 반환해 마지막에 await 가능 (모든 백업 완료 보장).
+let gistQueue = null;        // 다음에 보낼 페이로드 (가장 최신 1건만 유지)
+let gistInflight = false;    // 지금 전송 중인지
+let gistDrainPromise = null; // 진행 중인 drain 의 promise (마지막 await 용)
+
+function scheduleGistSave(payload) {
+  // 최신 페이로드로 큐 갱신 (옛 페이로드는 덮어써짐 = 어차피 최신이 더 정확)
+  gistQueue = payload;
+  if (!gistInflight) {
+    gistDrainPromise = drainGistQueue();
+  }
+  return gistDrainPromise;
+}
+
+async function drainGistQueue() {
+  if (gistInflight) return;
+  gistInflight = true;
+  try {
+    while (gistQueue) {
+      const payload = gistQueue;
+      gistQueue = null;
+      await saveToGist(payload);
+    }
+  } finally {
+    gistInflight = false;
+    gistDrainPromise = null;
+  }
+}
+
+// 로컬 파일 시스템 의존 없음 - 카드는 메모리 + Gist 에서만 보관
+// (DATA_DIR 도 만들 필요 없음)
 
 // ===== 분야별 검색어 =====
 // 한국 뉴스 검색어 (구글 뉴스 한국판). 빈 문자열이면 메인 헤드라인
@@ -211,6 +305,34 @@ const koreanPressFeeds = [
   }
 ];
 
+// ===== 사설/오피니언 RSS =====
+// 각 매체의 사설·칼럼 코너 피드.
+// side 표기는 사설 카드 5장을 보수1→진보1→외신1→보수1→진보1 순서로 뽑기 위한 분류.
+// URL 은 일부 미검증 - 죽은 곳은 test-feeds.js 결과 보고 정리 예정.
+const editorialFeeds = [
+  // 보수 (4곳 후보)
+  { source: '조선일보', side: 'conservative',
+    url: 'https://www.chosun.com/arc/outboundfeeds/rss/category/opinion/?outputType=xml' },
+  { source: '동아일보', side: 'conservative',
+    url: 'https://rss.donga.com/editorials.xml' },
+  { source: '매일경제', side: 'conservative',
+    url: 'https://www.mk.co.kr/rss/30000023/' },
+  { source: '한국경제', side: 'conservative',
+    url: 'https://www.hankyung.com/feed/opinion' },
+  // 진보 (4곳 후보)
+  { source: '한겨레', side: 'progressive',
+    url: 'http://www.hani.co.kr/rss/opinion/' },
+  { source: '경향신문', side: 'progressive',
+    url: 'https://www.khan.co.kr/rss/rssdata/opinion_news.xml' },
+  { source: '오마이뉴스', side: 'progressive',
+    url: 'https://rss.ohmynews.com/rss/opinion.xml' },
+  { source: '프레시안', side: 'progressive',
+    url: 'https://www.pressian.com/api/v3/site/rss/opinion' },
+  // 외신 (1곳)
+  { source: 'The New York Times', side: 'foreign',
+    url: 'https://rss.nytimes.com/services/xml/rss/nyt/Opinion.xml' }
+];
+
 const categoryLabels = {
   general: '종합',
   politics: '정치',
@@ -219,7 +341,8 @@ const categoryLabels = {
   health: '의료/건강',
   international: '국제',
   sports: '스포츠',
-  culture: '문화'
+  culture: '문화',
+  opinion: '오피니언'
 };
 
 // ===== 한국 매체 정치 성향 분류 =====
@@ -962,37 +1085,222 @@ function matchForeignArticles(foreignOutlets, foreignPool) {
 // 분야별로 생성할 카드 수 (각 섹션 최대 5개)
 const CARDS_PER_CATEGORY = 5;
 
-async function generateDailyCards() {
-  console.log('\n✨ [' + new Date().toLocaleString('ko-KR') + '] 자동 카드 생성 시작...');
+// 동시 실행 방지 락
+// - generate-now 가 빠르게 두 번 호출되거나
+// - 카드 생성 중 새벽 3시 크론이 겹치면
+// 두 인스턴스가 cards.json 에 동시에 쓰며 파일이 깨질 수 있다.
+// 이미 진행 중이면 새 호출은 무시한다.
+let isGeneratingCards = false;
 
-  // 기존 카드를 먼저 로드한다.
-  // - 분야별로 즉시 저장하므로, 어제 만든 카드는 새 카드로 덮어쓰기 전까지 유지된다.
-  // - 도중에 서비스가 죽어도 이미 저장된 분야는 살아남는다.
-  let allCards = {};
-  if (fs.existsSync(CARDS_FILE)) {
-    try {
-      const prev = JSON.parse(fs.readFileSync(CARDS_FILE, 'utf-8'));
-      if (prev && prev.cards) allCards = prev.cards;
-    } catch (e) {
-      allCards = {};
-    }
-  }
+// Gist 백업 상태 모니터링용
+// /api/health 에 노출 - 토큰 만료·Gist 삭제로 백업이 실패하기 시작하면 운영자가 알 수 있게.
+let lastGistSaveAt = null;
+let lastGistSaveOk = null;
+let lastGistError = null;
 
-  // 한 분야 끝날 때마다 cards.json 에 즉시 반영하는 헬퍼
-  const saveProgress = () => {
+// ===== 사설 RSS 수집 =====
+// 어제·오늘(KST) 발행된 사설만 수집. 각 매체의 side 표기 부착.
+// 9개 매체를 병렬로 호출 - 직렬 호출(최대 ~100초)을 ~10초로 단축.
+async function fetchEditorials() {
+  const yesterdayKst = kstDateStr(new Date(Date.now() - 24 * 60 * 60 * 1000));
+  const todayKst = kstDateStr(new Date());
+
+  const fetchOne = async (feed) => {
+    const out = [];
     try {
-      fs.writeFileSync(CARDS_FILE, JSON.stringify({
-        generatedAt: new Date().toISOString(),
-        cards: allCards
-      }, null, 2));
-      const total = Object.values(allCards).flat().length;
-      console.log(`   💾 cards.json 저장 (누적 ${total}장)`);
+      const parsed = await parser.parseURL(feed.url);
+      (parsed.items || []).slice(0, 40).forEach(item => {
+        const pubDate = item.pubDate || item.isoDate;
+        const kst = kstDateStr(pubDate);
+        // 어제·오늘 사설만 (어제 우선이지만 새벽엔 어제치가 적어 오늘도 포함)
+        if (kst !== yesterdayKst && kst !== todayKst) return;
+        out.push({
+          title: (item.title || '').trim(),
+          link: item.link,
+          description: (item.contentSnippet || item.content || '').slice(0, 1500),
+          pubDate,
+          source: feed.source,
+          side: feed.side,
+          image: extractImage(item),
+          kstDate: kst
+        });
+      });
     } catch (error) {
-      console.error('   ⚠️ 저장 오류:', error.message);
+      console.error(`사설 RSS 실패 (${feed.source}):`, error.message);
     }
+    return out;
   };
 
-  const categories = Object.keys(categoryLabels);
+  const results = await Promise.all(editorialFeeds.map(fetchOne));
+  return results.flat();
+}
+
+// ===== 사설 한 편을 Claude 가 분석 =====
+// 카드의 핵심 3요소: 중립 헤드라인, 핵심 주장, 찬성·반대 입장 + 프리즘의 정리
+async function analyzeEditorial(editorial) {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  try {
+    const message = await anthropic.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 4096,
+      messages: [
+        {
+          role: 'user',
+          content:
+`다음은 한국(또는 해외) 신문의 사설 한 편입니다. 매체의 정치적 색이 짙은 글입니다.
+
+매체: ${editorial.source}
+제목: ${editorial.title}
+본문 요약: ${editorial.description}
+링크: ${editorial.link}
+
+이 사설을 PRISM 오피니언 카드용으로 분석해 아래 JSON 형식으로만 응답하세요. 코드블록(\`\`\`)이나 설명 없이 순수 JSON만 출력합니다.
+
+{
+  "headline": "사설의 주장을 사실로 압축한 중립 제목. 12~22자. 자극어·따옴표·평가어 금지. 명사형 종결.",
+  "claim": "이 사설이 펼치는 핵심 주장을 한두 문장으로 중립 요약. '~해야 한다', '~이 문제다' 식으로 사설의 주장 그 자체를 명확히 드러낸다.",
+  "proArgument": "이 주장에 동의하는 시각의 가장 강한 논거를 3~4문장으로 제시. 가상의 인물이 아니라 '이런 근거로 동의할 수 있다'는 일반적 입장. 데이터·역사·원칙 등 구체적 근거를 들 것.",
+  "conArgument": "이 주장에 반대하는 시각의 가장 강한 논거를 3~4문장으로 제시. 마찬가지로 일반적 입장에서 '이런 근거로 반대할 수 있다'를 구체적으로. 찬성 논거와 같은 축에서 대비되게 쓸 것.",
+  "prismThought": {
+    "short": "프리즘의 정리 짧은 버전. 약 1분 30초 분량(350~500자). 이 사설이 던지는 질문이 우리 사회에서 왜 중요한지, 찬반이 갈리는 근본 이유는 무엇인지 차분히 정리. 어느 편도 들지 않는다.",
+    "long": "프리즘의 정리 긴 버전. 약 5분 분량(1300~1800자). 사설이 다룬 사안의 배경, 찬반 양쪽이 각각 무엇을 지키려 하는지, 깊은 가치 충돌은 무엇인지, 독자가 스스로 따져볼 질문까지 풀어 설명. 문단은 빈 줄로 구분. 음성으로 읽히므로 자연스러운 구어체 줄글로, 불릿이나 기호 사용 금지."
+  }
+}
+
+원칙:
+- 사설이 어느 진영의 글이든 PRISM 은 어느 한쪽도 편들지 않는다.
+- proArgument 와 conArgument 는 '같은 쟁점'을 서로 다르게 보는 방식으로 짝을 이루게 쓴다. 두 글을 나란히 읽으면 '여기서 갈리는구나'가 드러나야 한다.
+- 사설이 한쪽 입장만 강하게 펼치고 있어도, PRISM 카드는 반드시 양쪽 논거를 모두 제시한다.`
+        }
+      ]
+    });
+    let text = (message.content[0].text || '').trim();
+    text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start !== -1 && end !== -1) text = text.slice(start, end + 1);
+
+    const parsed = safeJsonParse(text);
+    return {
+      headline: (typeof parsed.headline === 'string') ? parsed.headline.trim() : '',
+      claim: (typeof parsed.claim === 'string') ? parsed.claim.trim() : '',
+      proArgument: (typeof parsed.proArgument === 'string') ? parsed.proArgument.trim() : '',
+      conArgument: (typeof parsed.conArgument === 'string') ? parsed.conArgument.trim() : '',
+      prismThought: {
+        short: (parsed.prismThought && parsed.prismThought.short) || '',
+        long: (parsed.prismThought && parsed.prismThought.long) || ''
+      }
+    };
+  } catch (error) {
+    console.error('사설 분석 오류:', error.message);
+    return null;
+  }
+}
+
+// ===== 오피니언 카드 생성 =====
+// 보수1 → 진보1 → 외신1 → 보수1 → 진보1 순서로 5장.
+// 매체가 부족하면 가능한 만큼만.
+async function generateOpinionCards() {
+  console.log('📰 오피니언 분야 처리 중...');
+  const all = await fetchEditorials();
+  console.log(`   → 사설 수집 ${all.length}건`);
+
+  // side 별로 그룹화
+  const byside = { conservative: [], progressive: [], foreign: [] };
+  all.forEach(a => { if (byside[a.side]) byside[a.side].push(a); });
+
+  // 각 진영 안에서 최신순 정렬
+  Object.values(byside).forEach(arr =>
+    arr.sort((a, b) => new Date(b.pubDate || 0) - new Date(a.pubDate || 0))
+  );
+
+  // 진영 다양성을 위해 같은 매체는 한 번만 (중복 매체 피함)
+  // 보수 자리 2장이 같은 조선일보로 채워지지 않도록 매체 단위로 골고루 뽑는다.
+  const usedSources = new Set();
+  const pick = (side) => {
+    while (byside[side].length > 0) {
+      const candidate = byside[side].shift();
+      if (!usedSources.has(candidate.source)) {
+        usedSources.add(candidate.source);
+        return candidate;
+      }
+    }
+    return null;
+  };
+
+  const order = ['conservative', 'progressive', 'foreign', 'conservative', 'progressive'];
+  const cards = [];
+
+  for (let i = 0; i < order.length; i++) {
+    const editorial = pick(order[i]);
+    if (!editorial) {
+      console.log(`   - 오피니언 ${i+1}/5 스킵: ${order[i]} 사설 없음`);
+      continue;
+    }
+    const analyzed = await analyzeEditorial(editorial);
+    if (!analyzed || !analyzed.headline) {
+      console.log(`   - 오피니언 ${i+1}/5 스킵: 분석 실패 (${editorial.source})`);
+      continue;
+    }
+
+    // 이미지·SVG 폴백
+    let image = editorial.image || '';
+    let svg = '';
+    if (!image) svg = await generateCardSvg(analyzed.headline, '오피니언');
+
+    cards.push({
+      id: `opinion_${cards.length}_${Date.now()}`,
+      category: 'opinion',
+      categoryLabel: '오피니언',
+      title: analyzed.headline,
+      date: formatDate(editorial.pubDate),
+      image,
+      svg,
+      source: editorial.source,
+      sourceUrl: editorial.link,
+      sourceSide: editorial.side,
+      editorialClaim: analyzed.claim,
+      proArgument: analyzed.proArgument,
+      conArgument: analyzed.conArgument,
+      prismThought: analyzed.prismThought
+    });
+    console.log(`   ✓ 오피니언 ${cards.length}/5: ${editorial.source}`);
+  }
+
+  console.log(`✅ 오피니언: ${cards.length}개 카드 생성`);
+  return cards;
+}
+
+async function generateDailyCards() {
+  // 동시 실행 방지 - 이미 진행 중이면 새 호출은 무시
+  if (isGeneratingCards) {
+    console.log('⏭️ 이미 카드 생성 진행 중 - 중복 호출 무시');
+    return;
+  }
+  isGeneratingCards = true;
+
+  try {
+    console.log('\n✨ [' + new Date().toLocaleString('ko-KR') + '] 자동 카드 생성 시작...');
+
+    // 메모리 캐시의 기존 카드를 시작점으로 사용한다.
+    // - 분야별로 즉시 갱신하므로, 어제 만든 카드는 새 카드로 덮어쓰기 전까지 유지된다.
+    // - 도중에 서비스가 죽어도 Gist 에 이미 백업된 분야는 살아남는다.
+    let allCards = { ...(cardsCache.cards || {}) };
+
+    // 한 분야 끝날 때마다 메모리·Gist 에 즉시 반영하는 헬퍼
+    // Gist 백업은 직렬화 큐로 - 순서 뒤집힘 race condition 방지
+    const saveProgress = () => {
+      cardsCache = {
+        generatedAt: new Date().toISOString(),
+        cards: allCards
+      };
+      const total = Object.values(allCards).flat().length;
+      console.log(`   💾 메모리 갱신 (누적 ${total}장)`);
+      scheduleGistSave(cardsCache);
+    };
+
+  // 일반 분야 루프 (opinion 은 데이터 구조가 달라 별도 함수로 처리하므로 제외)
+  const categories = Object.keys(categoryLabels).filter(c => c !== 'opinion');
 
   for (const category of categories) {
     console.log(`📰 ${categoryLabels[category]} 분야 처리 중...`);
@@ -1130,71 +1438,90 @@ async function generateDailyCards() {
     }
   }
 
-  console.log(`\n🎉 자동 카드 생성 완료! (${CARDS_FILE})`);
-  console.log(`총 ${Object.values(allCards).flat().length}개 카드`);
+  // ===== 오피니언 분야 (별도 처리: 보수1→진보1→외신1→보수1→진보1) =====
+  try {
+    const opinionCards = await generateOpinionCards();
+    allCards.opinion = opinionCards;
+    saveProgress();
+  } catch (error) {
+    console.error('❌ 오피니언 오류:', error.message);
+    if (!allCards.opinion) allCards.opinion = [];
+    saveProgress();
+  }
+
+    console.log(`\n🎉 자동 카드 생성 완료!`);
+    console.log(`총 ${Object.values(allCards).flat().length}개 카드`);
+
+    // 최종 백업 - 큐를 통과해서 모든 백업이 끝날 때까지 기다린다.
+    // (직접 saveToGist 호출하면 큐의 in-flight 요청과 race condition 재발생)
+    await scheduleGistSave(cardsCache);
+    console.log('☁️ 모든 Gist 백업 완료');
+  } finally {
+    isGeneratingCards = false;
+  }
 }
 
 // 크론 작업 등록: 매일 새벽 03:00(한국 시간)에 실행
 // - 그 전날 하루치 뉴스가 모두 쌓인 뒤, 어제치 기사로 카드를 만든다
+// - .catch 로 unhandled promise rejection 방지 (Node 18+ 에서는 프로세스가 죽을 수 있음)
 cron.schedule('0 3 * * *', () => {
-  generateDailyCards();
+  generateDailyCards().catch(err => {
+    console.error('❌ 크론 카드 생성 오류:', err);
+  });
 }, {
   timezone: 'Asia/Seoul'
 });
 
 console.log('⏰ 크론 작업 등록: 매일 새벽 3시에 자동 실행');
 
-// API 엔드포인트: 오늘의 카드 조회
+// API 엔드포인트: 오늘의 카드 조회 (메모리 캐시에서 즉시 응답)
 app.get('/api/cards', (req, res) => {
-  try {
-    if (!fs.existsSync(CARDS_FILE)) {
-      return res.json({
-        success: true,
-        message: '아직 생성된 카드가 없습니다. 내일 새벽 3시에 자동 생성됩니다.',
-        cards: {}
-      });
-    }
-    const data = JSON.parse(fs.readFileSync(CARDS_FILE, 'utf-8'));
-    res.json({ success: true, ...data });
-  } catch (error) {
-    console.error('카드 조회 오류:', error);
-    res.status(500).json({ success: false, error: error.message });
+  const total = Object.values(cardsCache.cards || {}).flat().length;
+  if (total === 0) {
+    return res.json({
+      success: true,
+      message: '아직 생성된 카드가 없습니다. 내일 새벽 3시에 자동 생성됩니다.',
+      cards: {}
+    });
   }
+  res.json({
+    success: true,
+    generatedAt: cardsCache.generatedAt,
+    cards: cardsCache.cards
+  });
 });
 
-// API 엔드포인트: 특정 분야의 카드 조회
+// API 엔드포인트: 특정 분야의 카드 조회 (메모리 캐시에서 즉시 응답)
 app.get('/api/cards/:category', (req, res) => {
-  try {
-    const { category } = req.params;
-    if (!fs.existsSync(CARDS_FILE)) {
-      return res.json({ success: true, message: '아직 생성된 카드가 없습니다.', cards: [] });
-    }
-    const data = JSON.parse(fs.readFileSync(CARDS_FILE, 'utf-8'));
-    const cards = data.cards[category] || [];
-    res.json({
-      success: true,
-      category: category,
-      categoryLabel: categoryLabels[category],
-      generatedAt: data.generatedAt,
-      total: cards.length,
-      cards: cards
-    });
-  } catch (error) {
-    console.error('카드 조회 오류:', error);
-    res.status(500).json({ success: false, error: error.message });
+  const { category } = req.params;
+  const cards = (cardsCache.cards && cardsCache.cards[category]) || [];
+  if (cards.length === 0) {
+    return res.json({ success: true, message: '아직 생성된 카드가 없습니다.', cards: [] });
   }
+  res.json({
+    success: true,
+    category: category,
+    categoryLabel: categoryLabels[category],
+    generatedAt: cardsCache.generatedAt,
+    total: cards.length,
+    cards: cards
+  });
 });
 
 // API 엔드포인트: 지금 바로 생성 (GET/POST 둘 다 지원)
-app.get('/api/generate-now', async (req, res) => {
+// 응답을 먼저 보내고 백그라운드로 카드 생성 진행 - 클라이언트가 기다리지 않음.
+// .catch 로 unhandled rejection 방지.
+function handleGenerateNow(req, res) {
+  if (isGeneratingCards) {
+    return res.json({ message: '이미 카드 생성 중입니다. 잠시만 기다려주세요.' });
+  }
   res.json({ message: '카드 생성 중... 잠시 후 완료됩니다.' });
-  await generateDailyCards();
-});
-
-app.post('/api/generate-now', async (req, res) => {
-  res.json({ message: '카드 생성 중... 잠시 후 완료됩니다.' });
-  await generateDailyCards();
-});
+  generateDailyCards().catch(err => {
+    console.error('❌ 수동 카드 생성 오류:', err);
+  });
+}
+app.get('/api/generate-now', handleGenerateNow);
+app.post('/api/generate-now', handleGenerateNow);
 
 // 기존 뉴스 조회 엔드포인트 (호환성 유지)
 app.get('/api/news', async (req, res) => {
@@ -1320,13 +1647,78 @@ app.get('/api/diagnose/:category', async (req, res) => {
 });
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
+  const total = Object.values(cardsCache.cards || {}).flat().length;
+  res.json({
+    status: 'ok',
+    timestamp: new Date(),
+    cardsInMemory: total,
+    cardsGeneratedAt: cardsCache.generatedAt,
+    isGeneratingCards,
+    gist: {
+      configured: !!(GIST_ID && GITHUB_TOKEN),
+      lastSaveAt: lastGistSaveAt,
+      lastSaveOk: lastGistSaveOk,
+      lastError: lastGistError
+    }
+  });
 });
 
+// 부트스트랩: Gist 백업에서 카드를 메모리에 미리 로드한 뒤 서버를 시작한다.
+// listen 콜백 안에서 await 하면 listen 은 이미 시작된 상태라
+// 그 사이 들어온 요청은 빈 cardsCache 를 본다 - 그래서 listen 전에 끝낸다.
+async function bootstrap() {
+  if (GIST_ID && GITHUB_TOKEN) {
+    console.log('☁️ Gist 백업에서 카드 로드 중...');
+    try {
+      const restored = await loadFromGist();
+      if (restored) {
+        cardsCache = restored;
+        const total = Object.values(restored.cards || {}).flat().length;
+        console.log(`☁️ Gist 에서 카드 로드 완료 (${total}장)`);
+      } else {
+        console.log('☁️ Gist 백업 없음 - 새벽 3시 또는 /api/generate-now 호출 시 카드 생성');
+      }
+    } catch (e) {
+      // Gist 로드 실패해도 서버는 시작 - 빈 메모리로 출발
+      console.error('☁️ Gist 로드 실패 - 빈 메모리로 시작:', e.message);
+    }
+  } else {
+    console.log('⚠️ GIST_ID / GITHUB_TOKEN 미설정 - 재배포 시 카드 사라짐');
+  }
+}
+
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`\n🚀 PRISM 뉴스 서버 실행 중: http://localhost:${PORT}`);
-  console.log('📰 구글 뉴스(한국·외신) + News API + Claude 분석');
-  console.log('⏰ 매일 새벽 3시에 자동 카드 생성');
-  console.log(`\n📌 테스트: http://localhost:${PORT}/api/generate-now (GET/POST)\n`);
+bootstrap().then(() => {
+  app.listen(PORT, () => {
+    console.log(`\n🚀 PRISM 뉴스 서버 실행 중: http://localhost:${PORT}`);
+    console.log('📰 구글 뉴스(한국·외신) + News API + Claude 분석');
+    console.log('⏰ 매일 새벽 3시에 자동 카드 생성');
+    console.log(`\n📌 테스트: http://localhost:${PORT}/api/generate-now (GET/POST)\n`);
+  });
+});
+
+// 프로세스 레벨 에러 안전망
+// - Node 18+ 에서는 unhandled rejection 으로 프로세스가 죽을 수 있다.
+// - 여기서 잡아서 로그만 남기면 서비스 계속 유지.
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('⚠️ Unhandled Promise Rejection:', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ Uncaught Exception:', err);
+});
+
+// Render 가 재배포·재시작 시 SIGTERM 을 보낸다.
+// 진행 중인 Gist 백업이 도중에 잘리면 데이터 손실 - 끝날 때까지 잠깐 대기.
+// Render grace period 는 약 30초라 충분.
+process.on('SIGTERM', async () => {
+  console.log('🛑 SIGTERM 수신 - 진행 중인 Gist 백업 마무리 중...');
+  try {
+    if (gistDrainPromise) {
+      await gistDrainPromise;
+      console.log('🛑 Gist 백업 완료 - 종료');
+    }
+  } catch (e) {
+    console.error('🛑 종료 중 오류:', e.message);
+  }
+  process.exit(0);
 });

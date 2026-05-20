@@ -172,6 +172,105 @@
 /* ── 보도가 갈리는 지점 (핵심 쟁점) ──
    사실 박스와 매체별 해석 사이에서 '여기서 갈린다'를 한 문장으로 못박는 역할.
    절제된 인용 스타일 - PRISM 브랜드 톤. */
+/* ──────────────────────────────────────────
+   오피니언(사설) 카드 전용 스타일
+   - 출처는 매체 + 진영 라벨이 또렷이 보이게
+   - 찬성·반대 박스는 같은 폭으로 세로 배치, 색만 약한 톤 차이
+   ────────────────────────────────────────── */
+.prism-card-opinion {
+  /* 일반 카드와 같은 padding/배경 유지 */
+}
+.prism-opinion-source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 10px;
+  flex-wrap: wrap;
+}
+.prism-opinion-side {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fff;
+}
+.prism-opinion-side-conservative { background: #a85a32; }   /* 머스타드-적갈 */
+.prism-opinion-side-progressive  { background: #2e5e8a; }   /* 차분한 청색 */
+.prism-opinion-side-foreign      { background: #5a6d52; }   /* 올리브-그레이 */
+.prism-opinion-side-unknown      { background: #888; }
+.prism-opinion-outlet {
+  font-weight: 600;
+  font-size: 14px;
+  color: #2a2440;
+}
+.prism-opinion-tag {
+  font-size: 11px;
+  color: #6a6a70;
+  padding: 1px 7px;
+  border: 1px solid #d9d4ca;
+  border-radius: 9px;
+}
+
+/* 사설의 핵심 주장 - 사실 박스와 비슷한 톤이지만 인용 느낌 */
+.prism-opinion-claim {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: #2a2440;
+  font-style: italic;
+}
+
+/* 찬성·반대 입장 박스 */
+.prism-opinion-args {
+  margin: 10px 0 14px;
+}
+.prism-opinion-args .prism-section-label {
+  margin-bottom: 9px;
+}
+.prism-opinion-arg {
+  margin-bottom: 9px;
+  padding: 11px 13px 12px;
+  border-radius: 7px;
+}
+.prism-opinion-arg:last-child { margin-bottom: 0; }
+.prism-opinion-arg-head {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin-bottom: 5px;
+}
+.prism-opinion-arg p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: #2a2440;
+}
+.prism-opinion-pro {
+  background: #f1ede4;            /* 옅은 베이지 */
+  border-left: 3px solid #a85a32; /* 보수 톤이 아닌, '찬성' 톤 - 따뜻한 색 */
+}
+.prism-opinion-pro .prism-opinion-arg-head { color: #8a4520; }
+.prism-opinion-con {
+  background: #ecf0f4;            /* 옅은 청색 */
+  border-left: 3px solid #2e5e8a; /* '반대' 톤 - 차분한 청색 */
+}
+.prism-opinion-con .prism-opinion-arg-head { color: #1f4566; }
+
+/* 소개 페이지 텍스트 스타일 (오피니언 설명) */
+.prism-about-text {
+  font-size: 14.5px;
+  line-height: 1.85;
+  color: #2a2440;
+  margin: 0 0 14px;
+}
+.prism-about-text:last-child { margin-bottom: 0; }
+.prism-about-text strong {
+  font-weight: 600;
+  color: #1a1530;
+}
+
 .prism-issue-box {
   margin: 10px 0 12px;
   padding: 11px 14px 12px;
